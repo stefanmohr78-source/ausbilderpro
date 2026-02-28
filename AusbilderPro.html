@@ -16,6 +16,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script>
 // Fallback falls Firebase nicht lädt
 window.addEventListener('load', ()=>{
@@ -587,6 +588,27 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   </div>
 </div>
 
+<!-- KURS DOKUMENTE MODAL -->
+<div class="dpov" id="courseDocsModal" onclick="if(event.target===this)closeCourseDocsModal()">
+  <div class="dpm" style="max-width:540px">
+    <div class="dpm-hd">
+      <div class="dpm-tit">📁 Kurs-Dokumente</div>
+      <button class="xcls" onclick="closeCourseDocsModal()">✕</button>
+    </div>
+    <div class="dpm-bd">
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="tbtn" onclick="docsUpload('file','course')" style="flex:1">📁 Datei hochladen</button>
+        <button class="tbtn" onclick="docsUpload('cam','course')" style="flex:1">📷 Kamera</button>
+      </div>
+      <input type="file" id="docsFileInCourse" style="display:none" onchange="docsHandleUpload(event,'course')">
+      <input type="file" id="docsCamInCourse" accept="image/*" capture="environment" style="display:none" onchange="docsHandleUpload(event,'course')">
+      <div id="docsListCourse" style="display:flex;flex-direction:column;gap:6px">
+        <div style="color:var(--mu);font-size:.75rem;text-align:center;padding:20px">Keine Dokumente vorhanden</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ADD KAT MODAL -->
 <div class="katml" id="katml" onclick="if(event.target===this)closeKatModal()">
   <div class="katml-box">
@@ -612,6 +634,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="tab active" onclick="stab('info')">📋 Person</button>
         <button class="tab" onclick="stab('grades')">📊 Noten</button>
         <button class="tab" onclick="stab('att')">📅 Anwesenheit</button>
+        <button class="tab" onclick="stab('docs')">📎 Dokumente</button>
       </div>
       <div class="tp active" id="tp-info">
         <div class="fg ac-wrap">
@@ -665,6 +688,23 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           </div>
         </div>
         <div class="fg"><label class="fl">Notizen</label><textarea class="fi ni" id="iNote" placeholder="Freitext..."></textarea></div>
+        <!-- FOTO -->
+        <div class="fg" style="margin-top:4px">
+          <label class="fl">Foto (nur intern sichtbar)</label>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:6px">
+            <div id="photoPreview" style="width:72px;height:72px;border-radius:50%;border:2px solid #3a4060;background:var(--sur2);display:flex;align-items:center;justify-content:center;font-size:1.8rem;overflow:hidden;flex-shrink:0;">👤</div>
+            <div style="display:flex;flex-direction:column;gap:6px;flex:1">
+              <div style="display:flex;gap:6px">
+                <button class="tbtn" onclick="document.getElementById('photoFileIn').click()" style="flex:1;font-size:.72rem">📁 Datei</button>
+                <button class="tbtn" onclick="document.getElementById('photoCamIn').click()" style="flex:1;font-size:.72rem">📷 Kamera</button>
+                <button class="tbtn" id="photoDelBtn" onclick="delPhoto()" style="font-size:.72rem;display:none">🗑</button>
+              </div>
+              <div style="font-size:.6rem;color:var(--mu)">Nur für Ausbilder sichtbar · nicht auf dem Sitzplan</div>
+            </div>
+          </div>
+          <input type="file" id="photoFileIn" accept="image/*" style="display:none" onchange="handlePhoto(event)">
+          <input type="file" id="photoCamIn" accept="image/*" capture="user" style="display:none" onchange="handlePhoto(event)">
+        </div>
       </div>
       <div class="tp" id="tp-grades">
         <p style="font-size:.73rem;color:var(--mu);margin-bottom:12px">Note: 1 = sehr gut &nbsp;·&nbsp; 6 = ungenügend</p>
@@ -727,6 +767,18 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div class="fg" style="margin-bottom:9px"><label class="fl">Bemerkung</label><input class="fi" type="text" id="aNote" placeholder="optional…"></div>
         <button class="badd" onclick="addAtt()">+ Eintrag hinzufügen</button>
         <div class="ahist" id="ahist"></div>
+      </div>
+      <!-- SCHÜLER DOKUMENTE TAB -->
+      <div class="tp" id="tp-docs">
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <button class="tbtn" onclick="docsUpload('file','seat')" style="flex:1;font-size:.75rem">📁 Datei hochladen</button>
+          <button class="tbtn" onclick="docsUpload('cam','seat')" style="flex:1;font-size:.75rem">📷 Kamera</button>
+        </div>
+        <input type="file" id="docsFileInSeat" style="display:none" onchange="docsHandleUpload(event,'seat')">
+        <input type="file" id="docsCamInSeat" accept="image/*" capture="environment" style="display:none" onchange="docsHandleUpload(event,'seat')">
+        <div id="docsListSeat" style="display:flex;flex-direction:column;gap:6px">
+          <div style="color:var(--mu);font-size:.75rem;text-align:center;padding:20px">Keine Dokumente vorhanden</div>
+        </div>
       </div>
       <button class="bsave" onclick="saveSeat()">💾 Speichern</button>
       <button class="bsave bdgr" onclick="clearSeat()">🗑 Sitzplatz leeren</button>
@@ -1073,6 +1125,7 @@ function renderMain(){
   }
   el.innerHTML=
     '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates">'+esc(instLabel(inst))+'</div></div>'
+    +'<button class="tbtn" onclick="openCourseDocsModal()" style="font-size:.72rem">📁 Kurs-Dokumente</button>'
     +'<button class="tbtn" style="border-color:var(--bad);color:var(--bad)" onclick="clearInstSeats()">⟳ Sitzplan leeren</button></div>'
     +'<div class="seating-wrap"><div class="seating" id="seatingEl"></div></div>'
     +'<div class="tafel">&#9616; Tafel / Lehrerpult &#9612;</div>'
@@ -1471,6 +1524,8 @@ function openModal(id){
   document.getElementById('iSchuljahr').value=d.schuljahr||'';
   document.getElementById('iKlasse').value=d.klasse||'';
   document.getElementById('iNote').value=d.note||'';
+  // Foto laden
+  loadPhotoPreview(d.photo||null);
   renderGradesTab(d);
   const now=new Date();
   setDateSelects(now.getFullYear(), now.getMonth()+1, now.getDate());
@@ -1482,6 +1537,8 @@ function openModal(id){
   document.getElementById('presentSub').classList.remove('show');
   document.querySelectorAll('.att-main-btn').forEach(b=>b.className='att-main-btn');
   updGrades();renderAtt();stab('info');refreshDataLists();
+  // Docs tab laden wenn aktiv
+  document.querySelector('.tab[onclick="stab(\'docs\')"]').onclick = ()=>{ stab('docs'); docsLoadList('seat'); };
   document.getElementById('ov').classList.add('open');
 }
 function closeModal(){document.getElementById('ov').classList.remove('open');curSeat=null;}
@@ -1637,6 +1694,51 @@ function renderAtt(){
     return '<div class="ae2" onclick="toggleAe(this,event)"><div class="aei"><div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span class="ab '+cf.cls+'">'+cf.label+'</span>'+extra+'</div><div class="aed">'+fmtD(a.date)+'</div>'+(a.note?'<div class="aen">'+esc(a.note)+'</div>':'')+'</div><button class="bdel" onclick="delAtt('+i+')">✕</button></div>';
   }).join('');
 }
+// ── FOTO ──
+let _tmpPhoto = undefined; // undefined = unverändert, null = gelöscht, string = neue Base64
+
+function loadPhotoPreview(photoData){
+  _tmpPhoto = undefined;
+  const prev = document.getElementById('photoPreview');
+  const delBtn = document.getElementById('photoDelBtn');
+  if(photoData){
+    prev.innerHTML = '<img src="'+photoData+'" style="width:100%;height:100%;object-fit:cover;">';
+    delBtn.style.display = '';
+  } else {
+    prev.innerHTML = '👤';
+    delBtn.style.display = 'none';
+  }
+}
+
+function handlePhoto(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    // Bild auf max 200x200 skalieren
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const max = 200;
+      const ratio = Math.min(max/img.width, max/img.height);
+      canvas.width = img.width * ratio;
+      canvas.height = img.height * ratio;
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      _tmpPhoto = canvas.toDataURL('image/jpeg', 0.75);
+      loadPhotoPreview(_tmpPhoto);
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+}
+
+function delPhoto(){
+  if(!confirm('Foto wirklich löschen?')) return;
+  _tmpPhoto = null;
+  loadPhotoPreview(null);
+}
+
 function saveSeat(){
   if(!curSeat||!S.curKat||!S.curInst)return;
   // Warn if user has selected date+status but not yet added the entry
@@ -1659,6 +1761,7 @@ function saveSeat(){
     schuljahr:document.getElementById('iSchuljahr').value,
     klasse:document.getElementById('iKlasse').value.trim(),
     note:document.getElementById('iNote').value.trim(),
+    photo:_tmpPhoto!==undefined ? _tmpPhoto : (curInst().seats[curSeat]?.photo||null),
     mitarbeit:fixed.mitarbeit,
     fuehrung:fixed.fuehrung,
     praxis:fixed.praxis,
@@ -1936,6 +2039,113 @@ function _pwHash(s){
   return (((h2>>>0).toString(16).padStart(8,'0'))+((h1>>>0).toString(16).padStart(8,'0')));
 }
 // ═══════════════════════════════════════════════
+// DOKUMENTE (Firebase Storage)
+// ═══════════════════════════════════════════════
+function docsUpload(type, scope){
+  const id = scope==='seat' ? (type==='cam' ? 'docsCamInSeat' : 'docsFileInSeat')
+                             : (type==='cam' ? 'docsCamInCourse' : 'docsFileInCourse');
+  document.getElementById(id).click();
+}
+
+function docsHandleUpload(e, scope){
+  const file = e.target.files[0];
+  if(!file || !_fbUid) return;
+  e.target.value = '';
+  const maxMB = 20;
+  if(file.size > maxMB * 1024 * 1024){ alert('Datei zu groß (max '+maxMB+' MB)'); return; }
+
+  // Build storage path
+  let path;
+  if(scope==='course'){
+    if(!S.curKat||!S.curInst){ alert('Kein Lehrgang ausgewählt'); return; }
+    path = 'users/'+_fbUid+'/courses/'+S.curKat+'_'+S.curInst+'/'+Date.now()+'_'+file.name;
+  } else {
+    if(!curSeat){ return; }
+    path = 'users/'+_fbUid+'/seats/'+S.curKat+'_'+S.curInst+'_'+curSeat+'/'+Date.now()+'_'+file.name;
+  }
+
+  const listEl = document.getElementById(scope==='course' ? 'docsListCourse' : 'docsListSeat');
+  // Show progress
+  const prog = document.createElement('div');
+  prog.style.cssText = 'background:var(--sur2);border:2px solid #3a4060;border-radius:8px;padding:10px 12px;font-size:.75rem;color:var(--mu)';
+  prog.textContent = '⬆ Lädt hoch: '+file.name+'…';
+  listEl.prepend(prog);
+
+  const ref = _st.ref(path);
+  const task = ref.put(file);
+  task.on('state_changed',
+    snap => { const pct = Math.round(snap.bytesTransferred/snap.totalBytes*100); prog.textContent = '⬆ '+pct+'% – '+file.name; },
+    err => { prog.textContent = '❌ Fehler: '+err.message; },
+    () => {
+      ref.getDownloadURL().then(url => {
+        // Save metadata to Firestore
+        const meta = { name: file.name, url, path, size: file.size, type: file.type, ts: Date.now(), uid: _fbUid };
+        const docPath = scope==='course'
+          ? 'users/'+_fbUid+'/courseDocs/'+S.curKat+'_'+S.curInst
+          : 'users/'+_fbUid+'/seatDocs/'+S.curKat+'_'+S.curInst+'_'+curSeat;
+        _db.collection('users').doc(_fbUid).collection(scope==='course'?'courseDocs':'seatDocs')
+          .doc(scope==='course' ? S.curKat+'_'+S.curInst : S.curKat+'_'+S.curInst+'_'+curSeat)
+          .collection('files').add(meta)
+          .then(() => {
+            prog.remove();
+            docsLoadList(scope);
+          });
+      });
+    }
+  );
+}
+
+function docsLoadList(scope){
+  if(!_fbUid) return;
+  const listEl = document.getElementById(scope==='course' ? 'docsListCourse' : 'docsListSeat');
+  const docId = scope==='course'
+    ? S.curKat+'_'+S.curInst
+    : S.curKat+'_'+S.curInst+'_'+curSeat;
+  const col = scope==='course' ? 'courseDocs' : 'seatDocs';
+
+  listEl.innerHTML = '<div style="color:var(--mu);font-size:.75rem;text-align:center;padding:12px">Lädt…</div>';
+  _db.collection('users').doc(_fbUid).collection(col).doc(docId).collection('files')
+    .orderBy('ts','desc').get()
+    .then(snap => {
+      if(snap.empty){ listEl.innerHTML='<div style="color:var(--mu);font-size:.75rem;text-align:center;padding:20px">Keine Dokumente vorhanden</div>'; return; }
+      listEl.innerHTML='';
+      snap.forEach(doc => {
+        const d = doc.data();
+        const item = document.createElement('div');
+        item.style.cssText = 'display:flex;align-items:center;gap:10px;background:var(--sur2);border:2px solid #3a4060;border-radius:8px;padding:9px 12px;';
+        const icon = d.type&&d.type.startsWith('image') ? '🖼' : d.type==='application/pdf' ? '📄' : '📎';
+        const size = d.size > 1024*1024 ? (d.size/1024/1024).toFixed(1)+' MB' : Math.round(d.size/1024)+' KB';
+        const date = new Date(d.ts).toLocaleDateString('de-DE');
+        item.innerHTML = '<span style="font-size:1.2rem">'+icon+'</span>'
+          +'<div style="flex:1;min-width:0"><div style="font-size:.78rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(d.name)+'</div>'
+          +'<div style="font-size:.62rem;color:var(--mu)">'+size+' · '+date+'</div></div>'
+          +'<a href="'+d.url+'" target="_blank" style="color:var(--acc);font-size:.7rem;text-decoration:none;border:1px solid var(--acc);border-radius:5px;padding:3px 8px">Öffnen</a>'
+          +'<button onclick="docsDelete(\''+doc.id+'\',\''+d.path+'\',\''+scope+'\')" style="background:none;border:none;color:var(--bad);cursor:pointer;font-size:.85rem;padding:2px 6px">🗑</button>';
+        listEl.appendChild(item);
+      });
+    })
+    .catch(() => { listEl.innerHTML='<div style="color:var(--bad);font-size:.75rem;text-align:center;padding:12px">Fehler beim Laden</div>'; });
+}
+
+function docsDelete(fileDocId, storagePath, scope){
+  if(!confirm('Dokument wirklich löschen?')) return;
+  const docId = scope==='course' ? S.curKat+'_'+S.curInst : S.curKat+'_'+S.curInst+'_'+curSeat;
+  const col = scope==='course' ? 'courseDocs' : 'seatDocs';
+  // Delete from Storage
+  _st.ref(storagePath).delete().catch(()=>{});
+  // Delete from Firestore
+  _db.collection('users').doc(_fbUid).collection(col).doc(docId).collection('files').doc(fileDocId).delete()
+    .then(()=> docsLoadList(scope));
+}
+
+function openCourseDocsModal(){
+  if(!S.curKat||!S.curInst){ alert('Bitte zuerst einen Lehrgang auswählen'); return; }
+  document.getElementById('courseDocsModal').classList.add('open');
+  docsLoadList('course');
+}
+function closeCourseDocsModal(){ document.getElementById('courseDocsModal').classList.remove('open'); }
+
+// ═══════════════════════════════════════════════
 // FIREBASE
 // ═══════════════════════════════════════════════
 const _fbCfg={
@@ -1946,11 +2156,12 @@ const _fbCfg={
   messagingSenderId:"937082794250",
   appId:"1:937082794250:web:eb99bc41d8f39908df8af3"
 };
-let _auth=null,_db=null,_fbUid=null,_syncTimer=null;
+let _auth=null,_db=null,_st=null,_fbUid=null,_syncTimer=null;
 try{
   firebase.initializeApp(_fbCfg);
   _auth=firebase.auth();
   _db=firebase.firestore();
+  _st=firebase.storage();
   // Nur für diese Sitzung eingeloggt bleiben – nach Browser-Schließen neu anmelden
   _auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
 
