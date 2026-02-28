@@ -125,6 +125,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .inst-del{background:none;border:none;color:transparent;font-size:.63rem;cursor:pointer;padding:2px 3px;border-radius:3px;transition:color .12s;line-height:1;flex-shrink:0;}
 .inst-row:hover .inst-del{color:var(--mu);}
 .inst-del:hover{color:var(--bad)!important;}
+.inst-docs-btn{background:none;border:none;color:transparent;font-size:.7rem;cursor:pointer;padding:2px 4px;border-radius:3px;transition:color .12s;line-height:1;flex-shrink:0;}
+.inst-row:hover .inst-docs-btn{color:var(--mu);}
+.inst-docs-btn:hover{color:var(--acc)!important;}
 .kat-newinst{display:none;align-items:center;gap:5px;padding:5px 10px 5px 24px;cursor:pointer;color:var(--acc);font-size:.73rem;font-weight:600;opacity:.7;transition:opacity .12s;flex-shrink:0;}
 .kat-newinst.show{display:flex;}
 .kat-newinst:hover{opacity:1;}
@@ -1017,7 +1020,7 @@ function renderSidebar(){
       const cnt=Object.values(inst.seats||{}).filter(d=>d&&d.name).length;
       const ir=document.createElement('div');
       ir.className='inst-row'+(active?' active':'');
-      ir.innerHTML='<div class="inst-dot"></div><div class="inst-info"><div class="inst-dates">'+esc(instLabel(inst))+'</div>'+(cnt?'<div class="inst-cnt">'+cnt+' Schüler</div>':'')+'</div><button class="inst-del" onclick="delInst(\''+id+'\',\''+iid+'\',event)">✕</button>';
+      ir.innerHTML='<div class="inst-dot"></div><div class="inst-info"><div class="inst-dates">'+esc(instLabel(inst))+'</div>'+(cnt?'<div class="inst-cnt">'+cnt+' Schüler</div>':'')+'</div><button class="inst-docs-btn" onclick="selInstAndOpenDocs(\''+id+'\',\''+iid+'\',event)" title="Kurs-Dokumente">📁</button><button class="inst-del" onclick="delInst(\''+id+'\',\''+iid+'\',event)">✕</button>';
       ir.querySelector('.inst-info').addEventListener('click',()=>selInst(id,iid));
       ir.querySelector('.inst-dot').addEventListener('click',()=>selInst(id,iid));
       ch.appendChild(ir);
@@ -1125,7 +1128,6 @@ function renderMain(){
   }
   el.innerHTML=
     '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates">'+esc(instLabel(inst))+'</div></div>'
-    +'<button class="tbtn" onclick="openCourseDocsModal()" style="font-size:.72rem">📁 Kurs-Dokumente</button>'
     +'<button class="tbtn" style="border-color:var(--bad);color:var(--bad)" onclick="clearInstSeats()">⟳ Sitzplan leeren</button></div>'
     +'<div class="seating-wrap"><div class="seating" id="seatingEl"></div></div>'
     +'<div class="tafel">&#9616; Tafel / Lehrerpult &#9612;</div>'
@@ -2119,8 +2121,8 @@ function docsLoadList(scope){
         item.innerHTML = '<span style="font-size:1.2rem">'+icon+'</span>'
           +'<div style="flex:1;min-width:0"><div style="font-size:.78rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(d.name)+'</div>'
           +'<div style="font-size:.62rem;color:var(--mu)">'+size+' · '+date+'</div></div>'
-          +'<a href="'+d.url+'" target="_blank" style="color:var(--acc);font-size:.7rem;text-decoration:none;border:1px solid var(--acc);border-radius:5px;padding:3px 8px">Öffnen</a>'
-          +'<button onclick="docsDelete(\''+doc.id+'\',\''+d.path+'\',\''+scope+'\')" style="background:none;border:none;color:var(--bad);cursor:pointer;font-size:.85rem;padding:2px 6px">🗑</button>';
+          +'<button onclick="window.open(this.dataset.url,\'_blank\')" data-url="'+esc(d.url)+'" style="color:var(--acc);font-size:.7rem;background:none;border:1px solid var(--acc);border-radius:5px;padding:3px 8px;cursor:pointer">Öffnen</button>'
+          +'<button onclick="docsDelete(\''+doc.id+'\',\''+esc(d.path)+'\',\''+scope+'\')" style="background:none;border:none;color:var(--bad);cursor:pointer;font-size:.85rem;padding:2px 6px">🗑</button>';
         listEl.appendChild(item);
       });
     })
@@ -2136,6 +2138,12 @@ function docsDelete(fileDocId, storagePath, scope){
   // Delete from Firestore
   _db.collection('users').doc(_fbUid).collection(col).doc(docId).collection('files').doc(fileDocId).delete()
     .then(()=> docsLoadList(scope));
+}
+
+function selInstAndOpenDocs(kid,iid,e){
+  e.stopPropagation();
+  selInst(kid,iid);
+  setTimeout(()=>openCourseDocsModal(),100);
 }
 
 function openCourseDocsModal(){
