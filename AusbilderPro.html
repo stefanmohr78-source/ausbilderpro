@@ -28,7 +28,6 @@ window.addEventListener('load', ()=>{
 :root{--bg:#161922;--sur:#1e2230;--sur2:#252a3a;--brd:#2e3450;--acc:#3b82f6;--acc2:#f59e0b;--ok:#10b981;--bad:#ef4444;--tx:#e2e8f0;--mu:#7a8aaa;--sw:238px;}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden;}
-body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(59,130,246,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(59,130,246,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
 
 /* HDR */
 .hdr{position:sticky;top:0;z-index:50;background:var(--sur);border-bottom:1px solid var(--brd);box-shadow:0 4px 24px rgba(0,0,0,.55);display:flex;align-items:center;gap:14px;padding:10px 18px;height:52px;}
