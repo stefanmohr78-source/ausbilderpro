@@ -2204,7 +2204,7 @@ function poolPlaceAll(allTN, kursId){
   const count = Math.min(freeSeats.length, unplaced.length);
   for(let i=0;i<count;i++){
     const t=unplaced[i];
-    inst.seats[freeSeats[i]] = {...(inst.seats[freeSeats[i]]||{}), name:t.name, company:t.company, profession:t.profession, ausbjahr:t.ausbjahr};
+    inst.seats[freeSeats[i]] = {...(inst.seats[freeSeats[i]]||{}), name:t.name, company:t.company, profession:t.profession, ausbjahr:t.ausbjahr, poolTnId:t.id, poolKursId:kursId};
     if(_db && kursId && t.id) _db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(t.id).update({status:'attending'}).catch(()=>{});
   }
   persist(); renderSeats(); loadPool();
@@ -2221,7 +2221,7 @@ function setupSeatDropTargets(){
       const inst=curInst(); if(!inst) return;
       const existing=inst.seats[id]||{};
       const card=document.querySelector('.pool-card[data-name="'+CSS.escape(_poolDragId)+'"]');
-      inst.seats[id]={ ...existing, name:_poolDragId, company:card?card.dataset.company:'', profession:card?card.dataset.profession:'', ausbjahr:card?card.dataset.ausbjahr:'' };
+      inst.seats[id]={ ...existing, name:_poolDragId, company:card?card.dataset.company:'', profession:card?card.dataset.profession:'', ausbjahr:card?card.dataset.ausbjahr:'', poolTnId:_poolDragTnId, poolKursId:_poolDragKursId };
       if(_db && _poolDragKursId && _poolDragTnId)
         _db.collection('shared').doc('kurse').collection('list').doc(_poolDragKursId).collection('teilnehmer').doc(_poolDragTnId).update({status:'attending'}).catch(()=>{});
       persist(); renderSeats(); loadPool();
@@ -2246,15 +2246,14 @@ function poolDropBack(e){
   if(!_seatDragId) return;
   const inst=curInst(); if(!inst) return;
   const d=inst.seats[_seatDragId]; if(!d||!d.name) return;
-  const name=d.name;
-  delete inst.seats[_seatDragId].name;
-  delete inst.seats[_seatDragId].company;
-  delete inst.seats[_seatDragId].profession;
-  delete inst.seats[_seatDragId].ausbjahr;
-  const kursId = inst.sharedKursId;
-  if(_db && kursId){
-    _db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').get()
-      .then(s=>{ s.forEach(doc=>{ if((doc.data().vorname+' '+doc.data().nachname).trim()===name) doc.ref.update({status:'absent'}); }); }).catch(()=>{});
+  const tnId   = d.poolTnId;
+  const kursId = d.poolKursId || inst.sharedKursId;
+  // Seat leeren
+  ['name','company','profession','ausbjahr','poolTnId','poolKursId'].forEach(k=>delete inst.seats[_seatDragId][k]);
+  // Firestore direkt per ID aktualisieren
+  if(_db && kursId && tnId){
+    _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+       .collection('teilnehmer').doc(tnId).update({status:'absent'}).catch(()=>{});
   }
   persist(); renderSeats(); loadPool();
   _seatDragId=null;
