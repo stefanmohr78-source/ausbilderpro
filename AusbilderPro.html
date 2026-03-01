@@ -2110,25 +2110,47 @@ function loadPool(){
   if(!inst) return;
   const kursId = inst.sharedKursId;
   const body = document.getElementById('poolBody');
+  const hdr = document.getElementById('poolPanel').querySelector('.pool-hdr span');
   if(!body) return;
   if(!kursId){
     body.innerHTML='<div class="pool-empty">Kein Kurs verknüpft.<br><span style="color:var(--acc);cursor:pointer" onclick="openPoolLink()">→ Jetzt verknüpfen</span></div>';
+    if(hdr) hdr.textContent='👥 Teilnehmerpool';
     return;
   }
   if(!_db){ body.innerHTML='<div class="pool-empty">Nicht eingeloggt</div>'; return; }
   body.innerHTML='<div class="pool-empty">Lädt…</div>';
-  _db.collection('shared').doc('kurse').collection('list').doc(kursId)
-    .collection('teilnehmer').orderBy('nachname').get()
+
+  // Kurs-Metadaten + Teilnehmer laden
+  const kursRef = _db.collection('shared').doc('kurse').collection('list').doc(kursId);
+  kursRef.get().then(kursDoc=>{
+    const kd = kursDoc.exists ? kursDoc.data() : {};
+    // Header aktualisieren mit Datum
+    if(hdr){
+      const dateTxt = (kd.von && kd.bis) ? kd.von+' – '+kd.bis : (kd.von||'');
+      hdr.innerHTML = '👥 Teilnehmerpool'+(dateTxt?'<br><span style="font-size:.58rem;color:var(--acc);font-weight:400;text-transform:none;letter-spacing:0">'+esc(kd.name||'')+'</span><br><span style="font-size:.58rem;color:var(--mu);font-weight:400;text-transform:none;letter-spacing:0">'+esc(dateTxt)+'</span>':'');
+    }
+
+    kursRef.collection('teilnehmer').orderBy('nachname').get()
     .then(snap=>{
       if(snap.empty){ body.innerHTML='<div class="pool-empty">Keine Teilnehmer im Kurs</div>'; return; }
-      // Welche Namen sind schon platziert?
       const seats = curSeats();
       const placed = new Set(Object.values(seats).filter(d=>d&&d.name).map(d=>d.name.trim().toLowerCase()));
+      const allTN = [];
       body.innerHTML='';
+
+      // "Alle übertragen" Button
+      const allBtn = document.createElement('button');
+      allBtn.className='tbtn';
+      allBtn.style.cssText='width:100%;margin-bottom:8px;font-size:.68rem;background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);color:var(--acc)';
+      allBtn.textContent='⚡ Alle automatisch platzieren';
+      allBtn.onclick = ()=> poolPlaceAll(allTN);
+      body.appendChild(allBtn);
+
       snap.forEach(doc=>{
         const d=doc.data();
         const fullName = (d.vorname+' '+d.nachname).trim();
         const isPlaced = placed.has(fullName.toLowerCase());
+        allTN.push({name:fullName, company:d.firma||'', profession:d.beruf||'', ausbjahr:d.ausbjahr||''});
         const initials = fullName.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
         const card = document.createElement('div');
         card.className='pool-card'+(isPlaced?' placed':'');
@@ -2148,9 +2170,39 @@ function loadPool(){
         card.addEventListener('dragend',()=>card.classList.remove('dragging'));
         body.appendChild(card);
       });
-      // Seats als Drop-Ziele
       setupSeatDropTargets();
     }).catch(()=>{body.innerHTML='<div class="pool-empty">Fehler beim Laden</div>';});
+  });
+}
+
+function poolPlaceAll(allTN){
+  const inst = curInst();
+  if(!inst) return;
+  // Alle freien Sitzplätze sammeln
+  const rows = getRows(inst);
+  const freeSeats = [];
+  rows.forEach(row=>{
+    row.seats.forEach(sid=>{
+      const d = inst.seats[sid];
+      if(!d||!d.name) freeSeats.push(sid);
+    });
+  });
+  // Nur noch nicht platzierte TN
+  const seats = curSeats();
+  const placed = new Set(Object.values(seats).filter(d=>d&&d.name).map(d=>d.name.trim().toLowerCase()));
+  const unplaced = allTN.filter(t=>!placed.has(t.name.toLowerCase()));
+  if(!unplaced.length){ alert('Alle Teilnehmer sind bereits platziert!'); return; }
+  if(freeSeats.length < unplaced.length){
+    if(!confirm(freeSeats.length+' freie Plätze, aber '+unplaced.length+' Teilnehmer. Es werden nur '+freeSeats.length+' platziert. Trotzdem?')) return;
+  }
+  const count = Math.min(freeSeats.length, unplaced.length);
+  for(let i=0;i<count;i++){
+    const t = unplaced[i];
+    inst.seats[freeSeats[i]] = {...(inst.seats[freeSeats[i]]||{}), name:t.name, company:t.company, profession:t.profession, ausbjahr:t.ausbjahr};
+  }
+  persist();
+  renderSeats();
+  loadPool();
 }
 
 function setupSeatDropTargets(){
