@@ -1874,8 +1874,17 @@ function saveSeat(){
 function clearSeat(){
   if(!curSeat||!S.curKat||!S.curInst)return;
   if(!confirm('Sitzplatz wirklich leeren?'))return;
-  delete S.kats[S.curKat].instances[S.curInst].seats[curSeat];
-  persist();renderSeats();updBadge();renderSidebar();closeModal();
+  const inst = S.kats[S.curKat].instances[S.curInst];
+  const d = inst.seats[curSeat];
+  // Firestore-Status zurücksetzen → "offen"
+  if(_db && d && d.poolTnId && (d.poolKursId || inst.sharedKursId)){
+    const kursId = d.poolKursId || inst.sharedKursId;
+    _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+      .collection('teilnehmer').doc(d.poolTnId)
+      .update({status: firebase.firestore.FieldValue.delete()}).catch(()=>{});
+  }
+  delete inst.seats[curSeat];
+  persist(); renderSeats(); updBadge(); renderSidebar(); closeModal(); loadPool();
 }
 
 // Export/Import – RC4 encrypted
