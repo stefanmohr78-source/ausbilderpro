@@ -578,6 +578,11 @@ function renderTeilnehmer(kursId){
             <div class="tn-name">${esc(d.vorname)} ${esc(d.nachname)}</div>
             <div class="tn-sub">${esc(d.firma||'')}${d.beruf?' · '+esc(d.beruf):''}${d.ausbjahr?' · '+d.ausbjahr+'. Jahr':''}</div>
           </div>
+          <div style="font-size:.65rem;padding:3px 8px;border-radius:12px;font-weight:600;${
+            d.status==='attending' ? 'background:rgba(34,197,94,.12);color:#22c55e;border:1px solid rgba(34,197,94,.3)' :
+            d.status==='absent'    ? 'background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.3)' :
+                                     'background:var(--sur);color:var(--mu);border:1px solid var(--brd)'
+          }">${d.status==='attending'?'✓ Anwesend':d.status==='absent'?'✗ Fehlt':'– Offen'}</div>
           <button class="tn-del" onclick="deleteTN('${doc.id}','${kursId}')">🗑</button>`;
         el.appendChild(item);
       });

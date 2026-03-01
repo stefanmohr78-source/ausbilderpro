@@ -128,12 +128,20 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .inst-docs-btn{background:none;border:none;color:var(--mu);font-size:.7rem;cursor:pointer;padding:2px 4px;border-radius:3px;transition:color .12s;line-height:1;flex-shrink:0;}
 .inst-docs-btn:hover{color:var(--acc)!important;}
 .main-dates-row{display:flex;align-items:center;gap:10px;}
-.main-body-row{display:flex;gap:16px;flex:1;min-height:0;}
+.main-body-row{display:flex;gap:0;flex:1;min-height:0;}
 .seating-col{flex:1;min-width:0;display:flex;flex-direction:column;}
-.pool-panel{width:220px;flex-shrink:0;background:var(--sur);border:1px solid var(--brd);border-radius:0;display:flex;flex-direction:column;overflow:hidden;border-top:none;border-bottom:none;border-right:none;}
-.pool-hdr{padding:10px 14px;border-bottom:1px solid var(--brd);font-size:.6rem;font-weight:700;display:flex;align-items:center;justify-content:space-between;gap:6px;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;font-family:'JetBrains Mono',monospace;}
-.pool-body{flex:1;overflow-y:auto;padding:8px 10px;}
-.pool-empty{color:var(--mu);font-size:.7rem;text-align:center;padding:20px 10px;font-family:'JetBrains Mono',monospace;}
+
+/* RECHTER POOL SIDEBAR */
+.pool-sidebar{width:230px;flex-shrink:0;background:var(--sur);border-left:1px solid var(--brd);display:flex;flex-direction:column;overflow:hidden;height:100%;}
+.pool-sb-hdr{padding:12px 14px;border-bottom:1px solid var(--brd);display:flex;flex-direction:column;gap:6px;background:var(--sur);}
+.pool-sb-title{font-size:.6rem;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;font-family:'JetBrains Mono',monospace;}
+.pool-sb-kursname{font-size:.72rem;font-weight:700;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pool-sb-dates{font-size:.62rem;color:var(--acc);font-family:'JetBrains Mono',monospace;}
+.pool-link-btn{background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);border-radius:6px;color:var(--acc);font-size:.65rem;font-family:'Sora',sans-serif;padding:5px 8px;cursor:pointer;transition:all .12s;text-align:center;}
+.pool-link-btn:hover{background:rgba(59,130,246,.2);}
+.pool-sb-body{flex:1;overflow-y:auto;padding:8px;}
+.pool-sb-body.pool-sb-dropover{background:rgba(59,130,246,.05);outline:2px dashed var(--acc);outline-offset:-4px;}
+.pool-empty{color:var(--mu);font-size:.7rem;text-align:center;padding:20px 10px;font-family:'JetBrains Mono',monospace;line-height:1.6;}
 .pool-card{background:var(--sur2);border:1px solid var(--brd);border-radius:8px;padding:8px 10px;margin-bottom:5px;cursor:grab;transition:all .12s;user-select:none;display:flex;align-items:center;gap:8px;}
 .pool-card:hover{border-color:var(--acc);background:rgba(59,130,246,.05);}
 .pool-card.dragging{opacity:.4;border-color:var(--acc);}
@@ -141,8 +149,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .pool-avatar{width:28px;height:28px;border-radius:50%;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25);display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:var(--acc);flex-shrink:0;}
 .pool-name{font-size:.73rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .pool-sub{font-size:.58rem;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pool-all-btn{width:100%;margin-bottom:8px;font-size:.68rem;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);border-radius:7px;color:var(--acc);padding:7px;cursor:pointer;font-family:'Sora',sans-serif;font-weight:600;transition:all .12s;}
+.pool-all-btn:hover{background:rgba(59,130,246,.2);}
 .seat.pool-target{outline:2px dashed var(--acc);outline-offset:2px;}
-@media(max-width:768px){.pool-panel{width:100%;height:160px;border:1px solid var(--brd);border-radius:10px;}.main-body-row{flex-direction:column;}}
+@media(max-width:900px){.pool-sidebar{display:none;}}
 .main-docs-btn{font-size:.65rem!important;padding:3px 9px!important;}
 .kat-newinst{display:none;align-items:center;gap:5px;padding:5px 10px 5px 24px;cursor:pointer;color:var(--acc);font-size:.73rem;font-weight:600;opacity:.7;transition:opacity .12s;flex-shrink:0;}
 .kat-newinst.show{display:flex;}
@@ -609,6 +619,16 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div id="katList"></div>
   </div>
   <div class="main" id="mainArea"></div>
+  <!-- RECHTER POOL SIDEBAR -->
+  <div class="pool-sidebar" id="poolSidebar">
+    <div class="pool-sb-hdr" id="poolSbHdr">
+      <div class="pool-sb-title">👥 Teilnehmerpool</div>
+      <button class="pool-link-btn" onclick="openPoolLink()">🔗 Kurs verknüpfen</button>
+    </div>
+    <div class="pool-sb-body" id="poolSbBody" ondragover="event.preventDefault();this.classList.add('pool-sb-dropover')" ondragleave="this.classList.remove('pool-sb-dropover')" ondrop="poolDropBack(event)">
+      <div class="pool-empty">Kein Kurs verknüpft.<br><span style="color:var(--acc);cursor:pointer" onclick="openPoolLink()">→ Jetzt verknüpfen</span></div>
+    </div>
+  </div>
 </div>
 
 <!-- DATE PICKER MODAL -->
@@ -1182,8 +1202,7 @@ function renderMain(){
   el.innerHTML=
     '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+'</div><button class="tbtn main-docs-btn" onclick="openCourseDocsModal()">📁 Dokumente</button></div></div>'
     +'</div>'
-    +'<div class="main-body-row">'
-    +'<div class="seating-col"><div class="seating-wrap"><div class="seating" id="seatingEl"></div></div>'
+    +'<div class="seating-wrap"><div class="seating" id="seatingEl"></div></div>'
     +'<div class="tafel">&#9616; Tafel / Lehrerpult &#9612;</div>'
     +'<div class="legend">'
     +'<div class="li"><div class="ld" style="background:#34d399"></div>Anwesend</div>'
@@ -1193,11 +1212,6 @@ function renderMain(){
     +'<div class="li"><div class="ld" style="background:#ef4444"></div>Abs. Unentsch.</div>'
     +'<div class="li"><div class="ld" style="background:#fcd34d"></div>Krank</div>'
     +'<div class="li"><div class="ld" style="background:#818cf8"></div>Berufsschule</div>'
-    +'</div></div>'
-    +'<div class="pool-panel" id="poolPanel">'
-    +'<div class="pool-hdr"><span>👥 Teilnehmerpool</span><button class="tbtn" onclick="openPoolLink()" style="font-size:.62rem;padding:3px 8px">🔗 Kurs verknüpfen</button></div>'
-    +'<div class="pool-body" id="poolBody"><div class="pool-empty">Kein Kurs verknüpft</div></div>'
-    +'</div>'
     +'</div>';
   renderSeats();
   loadPool();
@@ -2104,32 +2118,36 @@ function _pwHash(s){
 // TEILNEHMERPOOL (HBZ-Verknüpfung)
 // ═══════════════════════════════════════════════
 let _poolDragId = null;
+let _poolDragTnId = null;
+let _poolDragKursId = null;
+let _seatDragId = null;
 
 function loadPool(){
   const inst = curInst();
-  if(!inst) return;
-  const kursId = inst.sharedKursId;
-  const body = document.getElementById('poolBody');
-  const hdr = document.getElementById('poolPanel').querySelector('.pool-hdr span');
+  const body = document.getElementById('poolSbBody');
+  const hdr  = document.getElementById('poolSbHdr');
   if(!body) return;
+  if(!inst){
+    body.innerHTML='<div class="pool-empty">Kein Lehrgang ausgewählt</div>';
+    return;
+  }
+  const kursId = inst.sharedKursId;
   if(!kursId){
+    ['pool-sb-kursname','pool-sb-dates'].forEach(cls=>{ const el=hdr.querySelector('.'+cls); if(el) el.remove(); });
     body.innerHTML='<div class="pool-empty">Kein Kurs verknüpft.<br><span style="color:var(--acc);cursor:pointer" onclick="openPoolLink()">→ Jetzt verknüpfen</span></div>';
-    if(hdr) hdr.textContent='👥 Teilnehmerpool';
     return;
   }
   if(!_db){ body.innerHTML='<div class="pool-empty">Nicht eingeloggt</div>'; return; }
   body.innerHTML='<div class="pool-empty">Lädt…</div>';
-
-  // Kurs-Metadaten + Teilnehmer laden
   const kursRef = _db.collection('shared').doc('kurse').collection('list').doc(kursId);
   kursRef.get().then(kursDoc=>{
     const kd = kursDoc.exists ? kursDoc.data() : {};
-    // Header aktualisieren mit Datum
-    if(hdr){
-      const dateTxt = (kd.von && kd.bis) ? kd.von+' – '+kd.bis : (kd.von||'');
-      hdr.innerHTML = '👥 Teilnehmerpool'+(dateTxt?'<br><span style="font-size:.58rem;color:var(--acc);font-weight:400;text-transform:none;letter-spacing:0">'+esc(kd.name||'')+'</span><br><span style="font-size:.58rem;color:var(--mu);font-weight:400;text-transform:none;letter-spacing:0">'+esc(dateTxt)+'</span>':'');
-    }
-
+    let knEl = hdr.querySelector('.pool-sb-kursname');
+    if(!knEl){ knEl=document.createElement('div'); knEl.className='pool-sb-kursname'; hdr.insertBefore(knEl, hdr.querySelector('.pool-link-btn')); }
+    knEl.textContent = kd.name||'';
+    let dtEl = hdr.querySelector('.pool-sb-dates');
+    if(!dtEl){ dtEl=document.createElement('div'); dtEl.className='pool-sb-dates'; hdr.insertBefore(dtEl, hdr.querySelector('.pool-link-btn')); }
+    dtEl.textContent = (kd.von&&kd.bis) ? kd.von+' – '+kd.bis : (kd.von||'');
     kursRef.collection('teilnehmer').orderBy('nachname').get()
     .then(snap=>{
       if(snap.empty){ body.innerHTML='<div class="pool-empty">Keine Teilnehmer im Kurs</div>'; return; }
@@ -2137,25 +2155,23 @@ function loadPool(){
       const placed = new Set(Object.values(seats).filter(d=>d&&d.name).map(d=>d.name.trim().toLowerCase()));
       const allTN = [];
       body.innerHTML='';
-
-      // "Alle übertragen" Button
       const allBtn = document.createElement('button');
-      allBtn.className='tbtn';
-      allBtn.style.cssText='width:100%;margin-bottom:8px;font-size:.68rem;background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);color:var(--acc)';
+      allBtn.className='pool-all-btn';
       allBtn.textContent='⚡ Alle automatisch platzieren';
-      allBtn.onclick = ()=> poolPlaceAll(allTN);
+      allBtn.onclick = ()=>poolPlaceAll(allTN, kursId);
       body.appendChild(allBtn);
-
       snap.forEach(doc=>{
         const d=doc.data();
         const fullName = (d.vorname+' '+d.nachname).trim();
         const isPlaced = placed.has(fullName.toLowerCase());
-        allTN.push({name:fullName, company:d.firma||'', profession:d.beruf||'', ausbjahr:d.ausbjahr||''});
+        allTN.push({id:doc.id, name:fullName, company:d.firma||'', profession:d.beruf||'', ausbjahr:d.ausbjahr||''});
         const initials = fullName.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
         const card = document.createElement('div');
         card.className='pool-card'+(isPlaced?' placed':'');
         card.draggable=!isPlaced;
         card.dataset.name=fullName;
+        card.dataset.tnid=doc.id;
+        card.dataset.kursid=kursId;
         card.dataset.company=d.firma||'';
         card.dataset.profession=d.beruf||'';
         card.dataset.ausbjahr=d.ausbjahr||'';
@@ -2163,78 +2179,85 @@ function loadPool(){
           +'<div style="flex:1;min-width:0"><div class="pool-name">'+esc(fullName)+'</div>'
           +'<div class="pool-sub">'+(isPlaced?'✓ Platziert':esc(d.firma||d.beruf||''))+'</div></div>';
         card.addEventListener('dragstart',e=>{
-          _poolDragId=fullName;
-          card.classList.add('dragging');
-          e.dataTransfer.effectAllowed='copy';
+          _poolDragId=fullName; _poolDragTnId=doc.id; _poolDragKursId=kursId;
+          card.classList.add('dragging'); e.dataTransfer.effectAllowed='copy';
         });
         card.addEventListener('dragend',()=>card.classList.remove('dragging'));
         body.appendChild(card);
       });
       setupSeatDropTargets();
-    }).catch(()=>{body.innerHTML='<div class="pool-empty">Fehler beim Laden</div>';});
+    }).catch(()=>{ body.innerHTML='<div class="pool-empty">Fehler beim Laden</div>'; });
   });
 }
 
-function poolPlaceAll(allTN){
-  const inst = curInst();
-  if(!inst) return;
-  // Alle freien Sitzplätze sammeln
-  const rows = getRows(inst);
-  const freeSeats = [];
-  rows.forEach(row=>{
-    row.seats.forEach(sid=>{
-      const d = inst.seats[sid];
-      if(!d||!d.name) freeSeats.push(sid);
-    });
-  });
-  // Nur noch nicht platzierte TN
+function poolPlaceAll(allTN, kursId){
+  const inst = curInst(); if(!inst) return;
+  const rows = getRows(inst); const freeSeats = [];
+  rows.forEach(row=>row.seats.forEach(sid=>{ const d=inst.seats[sid]; if(!d||!d.name) freeSeats.push(sid); }));
   const seats = curSeats();
   const placed = new Set(Object.values(seats).filter(d=>d&&d.name).map(d=>d.name.trim().toLowerCase()));
   const unplaced = allTN.filter(t=>!placed.has(t.name.toLowerCase()));
   if(!unplaced.length){ alert('Alle Teilnehmer sind bereits platziert!'); return; }
   if(freeSeats.length < unplaced.length){
-    if(!confirm(freeSeats.length+' freie Plätze, aber '+unplaced.length+' Teilnehmer. Es werden nur '+freeSeats.length+' platziert. Trotzdem?')) return;
+    if(!confirm(freeSeats.length+' freie Plätze, aber '+unplaced.length+' Teilnehmer. Es werden '+freeSeats.length+' platziert. Trotzdem?')) return;
   }
   const count = Math.min(freeSeats.length, unplaced.length);
   for(let i=0;i<count;i++){
-    const t = unplaced[i];
+    const t=unplaced[i];
     inst.seats[freeSeats[i]] = {...(inst.seats[freeSeats[i]]||{}), name:t.name, company:t.company, profession:t.profession, ausbjahr:t.ausbjahr};
+    if(_db && kursId && t.id) _db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(t.id).update({status:'attending'}).catch(()=>{});
   }
-  persist();
-  renderSeats();
-  loadPool();
+  persist(); renderSeats(); loadPool();
 }
 
 function setupSeatDropTargets(){
   document.querySelectorAll('.seat').forEach(el=>{
-    el.addEventListener('dragover',e=>{
-      e.preventDefault();
-      el.classList.add('pool-target');
-    });
+    el.addEventListener('dragover',e=>{ e.preventDefault(); el.classList.add('pool-target'); });
     el.addEventListener('dragleave',()=>el.classList.remove('pool-target'));
     el.addEventListener('drop',e=>{
-      e.preventDefault();
-      el.classList.remove('pool-target');
+      e.preventDefault(); el.classList.remove('pool-target');
       if(!_poolDragId) return;
       const id=el.id.replace('seat-','');
-      const inst=curInst();
-      if(!inst) return;
+      const inst=curInst(); if(!inst) return;
       const existing=inst.seats[id]||{};
-      // Finde Kartendaten
-      const card=document.querySelector('.pool-card[data-name="'+_poolDragId.replace(/"/g,'&quot;')+'"]');
-      inst.seats[id]={
-        ...existing,
-        name:_poolDragId,
-        company:card?card.dataset.company:'',
-        profession:card?card.dataset.profession:'',
-        ausbjahr:card?card.dataset.ausbjahr:'',
-      };
-      persist();
-      renderSeats();
-      loadPool();
-      _poolDragId=null;
+      const card=document.querySelector('.pool-card[data-name="'+CSS.escape(_poolDragId)+'"]');
+      inst.seats[id]={ ...existing, name:_poolDragId, company:card?card.dataset.company:'', profession:card?card.dataset.profession:'', ausbjahr:card?card.dataset.ausbjahr:'' };
+      if(_db && _poolDragKursId && _poolDragTnId)
+        _db.collection('shared').doc('kurse').collection('list').doc(_poolDragKursId).collection('teilnehmer').doc(_poolDragTnId).update({status:'attending'}).catch(()=>{});
+      persist(); renderSeats(); loadPool();
+      _poolDragId=null; _poolDragTnId=null; _poolDragKursId=null;
     });
+    el.setAttribute('draggable','true');
+    el.addEventListener('dragstart',e=>{
+      const inst=curInst(); if(!inst) return;
+      const id=el.id.replace('seat-','');
+      const d=inst.seats[id];
+      if(!d||!d.name||_poolDragId) return;
+      _seatDragId=id;
+      e.dataTransfer.effectAllowed='move';
+    });
+    el.addEventListener('dragend',()=>{ _seatDragId=null; });
   });
+}
+
+function poolDropBack(e){
+  e.preventDefault();
+  document.getElementById('poolSbBody').classList.remove('pool-sb-dropover');
+  if(!_seatDragId) return;
+  const inst=curInst(); if(!inst) return;
+  const d=inst.seats[_seatDragId]; if(!d||!d.name) return;
+  const name=d.name;
+  delete inst.seats[_seatDragId].name;
+  delete inst.seats[_seatDragId].company;
+  delete inst.seats[_seatDragId].profession;
+  delete inst.seats[_seatDragId].ausbjahr;
+  const kursId = inst.sharedKursId;
+  if(_db && kursId){
+    _db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').get()
+      .then(s=>{ s.forEach(doc=>{ if((doc.data().vorname+' '+doc.data().nachname).trim()===name) doc.ref.update({status:'absent'}); }); }).catch(()=>{});
+  }
+  persist(); renderSeats(); loadPool();
+  _seatDragId=null;
 }
 
 function openPoolLink(){
