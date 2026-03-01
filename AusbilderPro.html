@@ -130,18 +130,19 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .main-dates-row{display:flex;align-items:center;gap:10px;}
 .main-body-row{display:flex;gap:16px;flex:1;min-height:0;}
 .seating-col{flex:1;min-width:0;display:flex;flex-direction:column;}
-.pool-panel{width:220px;flex-shrink:0;background:var(--sur);border:2px solid var(--brd);border-radius:12px;display:flex;flex-direction:column;overflow:hidden;}
-.pool-hdr{padding:10px 12px;border-bottom:1px solid var(--brd);font-size:.75rem;font-weight:700;display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--sur2);}
-.pool-body{flex:1;overflow-y:auto;padding:8px;}
-.pool-empty{color:var(--mu);font-size:.7rem;text-align:center;padding:20px 10px;}
-.pool-card{background:var(--sur2);border:2px solid var(--brd);border-radius:8px;padding:8px 10px;margin-bottom:5px;cursor:grab;transition:border .12s;user-select:none;}
-.pool-card:hover{border-color:var(--acc);}
+.pool-panel{width:220px;flex-shrink:0;background:var(--sur);border:1px solid var(--brd);border-radius:0;display:flex;flex-direction:column;overflow:hidden;border-top:none;border-bottom:none;border-right:none;}
+.pool-hdr{padding:10px 14px;border-bottom:1px solid var(--brd);font-size:.6rem;font-weight:700;display:flex;align-items:center;justify-content:space-between;gap:6px;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;font-family:'JetBrains Mono',monospace;}
+.pool-body{flex:1;overflow-y:auto;padding:8px 10px;}
+.pool-empty{color:var(--mu);font-size:.7rem;text-align:center;padding:20px 10px;font-family:'JetBrains Mono',monospace;}
+.pool-card{background:var(--sur2);border:1px solid var(--brd);border-radius:8px;padding:8px 10px;margin-bottom:5px;cursor:grab;transition:all .12s;user-select:none;display:flex;align-items:center;gap:8px;}
+.pool-card:hover{border-color:var(--acc);background:rgba(59,130,246,.05);}
 .pool-card.dragging{opacity:.4;border-color:var(--acc);}
-.pool-card.placed{opacity:.4;border-color:var(--ok);border-style:dashed;}
-.pool-name{font-size:.75rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.pool-sub{font-size:.6rem;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pool-card.placed{opacity:.45;border-color:var(--ok);border-style:dashed;cursor:default;}
+.pool-avatar{width:28px;height:28px;border-radius:50%;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25);display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:var(--acc);flex-shrink:0;}
+.pool-name{font-size:.73rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pool-sub{font-size:.58rem;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .seat.pool-target{outline:2px dashed var(--acc);outline-offset:2px;}
-@media(max-width:768px){.pool-panel{width:100%;height:160px;}.main-body-row{flex-direction:column;}}
+@media(max-width:768px){.pool-panel{width:100%;height:160px;border:1px solid var(--brd);border-radius:10px;}.main-body-row{flex-direction:column;}}
 .main-docs-btn{font-size:.65rem!important;padding:3px 9px!important;}
 .kat-newinst{display:none;align-items:center;gap:5px;padding:5px 10px 5px 24px;cursor:pointer;color:var(--acc);font-size:.73rem;font-weight:600;opacity:.7;transition:opacity .12s;flex-shrink:0;}
 .kat-newinst.show{display:flex;}
@@ -1180,7 +1181,7 @@ function renderMain(){
   }
   el.innerHTML=
     '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+'</div><button class="tbtn main-docs-btn" onclick="openCourseDocsModal()">📁 Dokumente</button></div></div>'
-    +'<button class="tbtn" style="border-color:var(--bad);color:var(--bad)" onclick="clearInstSeats()">⟳ Sitzplan leeren</button></div>'
+    +'</div>'
     +'<div class="main-body-row">'
     +'<div class="seating-col"><div class="seating-wrap"><div class="seating" id="seatingEl"></div></div>'
     +'<div class="tafel">&#9616; Tafel / Lehrerpult &#9612;</div>'
@@ -2128,6 +2129,7 @@ function loadPool(){
         const d=doc.data();
         const fullName = (d.vorname+' '+d.nachname).trim();
         const isPlaced = placed.has(fullName.toLowerCase());
+        const initials = fullName.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
         const card = document.createElement('div');
         card.className='pool-card'+(isPlaced?' placed':'');
         card.draggable=!isPlaced;
@@ -2135,8 +2137,9 @@ function loadPool(){
         card.dataset.company=d.firma||'';
         card.dataset.profession=d.beruf||'';
         card.dataset.ausbjahr=d.ausbjahr||'';
-        card.innerHTML='<div class="pool-name">'+esc(fullName)+'</div>'
-          +'<div class="pool-sub">'+(isPlaced?'✓ Platziert':esc(d.firma||d.beruf||''))+'</div>';
+        card.innerHTML='<div class="pool-avatar">'+initials+'</div>'
+          +'<div style="flex:1;min-width:0"><div class="pool-name">'+esc(fullName)+'</div>'
+          +'<div class="pool-sub">'+(isPlaced?'✓ Platziert':esc(d.firma||d.beruf||''))+'</div></div>';
         card.addEventListener('dragstart',e=>{
           _poolDragId=fullName;
           card.classList.add('dragging');
@@ -2388,7 +2391,8 @@ try{
         // Admin: Auswahl anbieten
         showRoleChoice(user.email);
       } else {
-        // Normaler Ausbilder
+        // Normaler Ausbilder – E-Mail speichern damit Verwaltung sie sieht
+        _db.collection('users').doc(_fbUid).set({email: user.email}, {merge:true}).catch(()=>{});
         document.getElementById('pwScreen').style.display='none';
         document.getElementById('fbLogoutBtn').style.display='';
         document.getElementById('cloudInd').textContent='☁ '+user.email.split('@')[0];

@@ -147,6 +147,13 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .toast{position:fixed;bottom:20px;right:20px;background:var(--sur);border:2px solid var(--ok);border-radius:10px;padding:12px 18px;font-size:.8rem;font-weight:600;color:var(--ok);z-index:999;transform:translateY(60px);opacity:0;transition:all .25s;}
 .toast.show{transform:none;opacity:1;}
 
+/* AUTOCOMPLETE */
+.ac-wrap{position:relative;}
+.ac-drop{position:absolute;top:100%;left:0;right:0;background:var(--sur);border:2px solid var(--acc);border-top:none;border-radius:0 0 9px 9px;z-index:50;max-height:180px;overflow-y:auto;display:none;}
+.ac-drop.open{display:block;}
+.ac-item{padding:8px 14px;font-size:.82rem;cursor:pointer;transition:background .1s;}
+.ac-item:hover,.ac-item.ac-sel{background:rgba(59,130,246,.12);color:var(--acc);}
+
 /* UPLOAD AREA */
 .upload-area{border:2px dashed var(--brd);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:border .15s;font-size:.78rem;color:var(--mu);}
 .upload-area:hover{border-color:var(--acc);color:var(--acc);}
@@ -227,7 +234,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
                 <div class="fg"><label class="fl">Von</label><input class="fi" type="date" id="newKursVon"></div>
                 <div class="fg"><label class="fl">Bis</label><input class="fi" type="date" id="newKursBis"></div>
               </div>
-              <div class="fg"><label class="fl">E-Mail des Ausbilders <span style="color:var(--bad)">*</span></label><input class="fi" id="newKursAusbilder" placeholder="ausbilder@hbz.de" type="email"></div>
+              <div class="fg"><label class="fl">E-Mail des Ausbilders <span style="color:var(--bad)">*</span></label>
+                <input class="fi" id="newKursAusbilder" placeholder="ausbilder@hbz.de" type="email" list="ausbilderEmailList">
+                <datalist id="ausbilderEmailList"></datalist>
+              </div>
               <button class="btn-sm btn-ok" onclick="createKurs()" style="width:100%;margin-top:6px">✓ Kurs erstellen</button>
             </div>
           </div>
@@ -254,6 +264,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         </div>
 
         <div id="tnArea" style="display:none">
+          <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+            <button class="btn-sm btn-ok" onclick="uebertragen()" style="display:flex;align-items:center;gap:8px;padding:10px 20px;font-size:.8rem">
+              🚀 Jetzt Übertragen
+            </button>
+          </div>
           <div class="grid2">
             <div>
               <div class="card">
@@ -267,9 +282,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
                     <div class="fg"><label class="fl">Vorname</label><input class="fi" id="tnVorname" placeholder="Max"></div>
                     <div class="fg"><label class="fl">Nachname</label><input class="fi" id="tnNachname" placeholder="Mustermann"></div>
                   </div>
-                  <div class="fg"><label class="fl">Ausbildungsbetrieb</label><input class="fi" id="tnFirma" placeholder="Firma GmbH"></div>
+                  <div class="fg ac-wrap"><label class="fl">Ausbildungsbetrieb</label><input class="fi" id="tnFirma" placeholder="Firma GmbH" autocomplete="off" oninput="hvAc('tnFirma','acFirma','firma')" onfocus="hvAc('tnFirma','acFirma','firma')" onblur="setTimeout(()=>closeAc('acFirma'),200)"><div class="ac-drop" id="acFirma"></div></div>
                   <div class="form-row">
-                    <div class="fg"><label class="fl">Beruf</label><input class="fi" id="tnBeruf" placeholder="Elektroniker EuG"></div>
+                    <div class="fg ac-wrap"><label class="fl">Beruf</label><input class="fi" id="tnBeruf" placeholder="Elektroniker EuG" autocomplete="off" oninput="hvAc('tnBeruf','acBeruf','beruf')" onfocus="hvAc('tnBeruf','acBeruf','beruf')" onblur="setTimeout(()=>closeAc('acBeruf'),200)"><div class="ac-drop" id="acBeruf"></div></div>
                     <div class="fg"><label class="fl">Ausbildungsjahr</label>
                       <select class="fi" id="tnAusbjahr">
                         <option value="">–</option>
@@ -396,6 +411,9 @@ auth.onAuthStateChanged(u => {
       document.getElementById('appWrap').style.display = 'flex';
       document.getElementById('hdrUser').textContent = _email;
       loadAll();
+      loadAusbilderEmails();
+      // Eigene E-Mail im User-Dokument speichern damit andere sie finden können
+      db.collection('users').doc(_uid).set({email: u.email, role:'admin'}, {merge:true});
     });
   } else {
     _uid = null;
@@ -538,6 +556,7 @@ function loadTeilnehmer(){
   document.getElementById('tnArea').style.display='block';
   _selectedKursId = kursId;
   renderTeilnehmer(kursId);
+  collectFirmen();
 }
 
 function renderTeilnehmer(kursId){
@@ -704,6 +723,87 @@ function deleteKursDoc(docId,path,kursId){
 }
 
 // ── Utils ──
+const PROF_LIST=[
+  'Elektroniker – Energie- und Gebäudetechnik (EuG)',
+  'Elektroniker – Automatisierungstechnik (AT)',
+  'Elektroniker – Betriebstechnik (BT)',
+  'Elektroniker – Gebäude- und Infrastruktursysteme (GIS)',
+  'Elektroniker – Informations- und Systemtechnik (IS)',
+  'Elektroniker – Maschinen- und Antriebstechnik (MAT)',
+  'Elektroanlagenmonteur','Elektroinstallateur','Systemelektroniker','Mechatroniker',
+  'Kraftfahrzeugmechatroniker – PKW-Technik',
+  'Kraftfahrzeugmechatroniker – Nutzfahrzeugtechnik',
+  'Kraftfahrzeugmechatroniker – Karosserie- und Fahrzeugbautechnik',
+  'Anlagenmechaniker SHK','Zentralheizungs- und Lüftungsbauer',
+  'Tischler','Schreiner','Bäcker',
+  'Fachverkäufer Lebensmittelhandwerk – Bäckerei',
+  'Maler und Lackierer – Gestaltung und Instandhaltung',
+  'Zimmerer','Maurer','Fliesen- Platten- und Mosaikleger',
+  'Koch','Fachkraft im Gastgewerbe','Hotelfachmann/-frau',
+  'Kaufmann/-frau im Einzelhandel','Verkäufer/in',
+  'Kaufmann/-frau für Büromanagement','Industriekaufmann/-frau',
+];
+
+// Autocomplete
+let _firmenList = [];
+function hvAc(inputId, dropId, type){
+  const val = document.getElementById(inputId).value.toLowerCase();
+  const list = type==='beruf' ? PROF_LIST : _firmenList;
+  const drop = document.getElementById(dropId);
+  const matches = list.filter(x=>x.toLowerCase().includes(val));
+  if(!matches.length){ drop.classList.remove('open'); return; }
+  drop.innerHTML = matches.slice(0,10).map(m=>`<div class="ac-item" onmousedown="pickAc('${inputId}','${dropId}','${m.replace(/'/g,"\\'")}')">${esc(m)}</div>`).join('');
+  drop.classList.add('open');
+}
+function pickAc(inputId, dropId, val){
+  document.getElementById(inputId).value = val;
+  document.getElementById(dropId).classList.remove('open');
+}
+function closeAc(dropId){ document.getElementById(dropId).classList.remove('open'); }
+
+// Firmen sammeln aus allen Teilnehmern
+function collectFirmen(){
+  if(!_selectedKursId) return;
+  db.collection('shared').doc('kurse').collection('list').doc(_selectedKursId)
+    .collection('teilnehmer').get()
+    .then(snap=>{
+      const set = new Set();
+      snap.forEach(d=>{ if(d.data().firma) set.add(d.data().firma); });
+      _firmenList = [...set];
+    });
+}
+
+// ── Jetzt Übertragen ──
+function uebertragen(){
+  if(!_selectedKursId){ toast('Kein Kurs ausgewählt','bad'); return; }
+  const kurs = _kurse.find(k=>k.id===_selectedKursId);
+  if(!kurs){ toast('Kurs nicht gefunden','bad'); return; }
+  if(!kurs.ausbilderEmail){ toast('Diesem Kurs ist keine Ausbilder-E-Mail zugeordnet','bad'); return; }
+  if(!confirm('Alle Teilnehmer an den Ausbilder ('+kurs.ausbilderEmail+') übertragen? Der Ausbilder sieht sie dann im Teilnehmerpool.')) return;
+  // Der Pool wird automatisch per Firebase geladen wenn der Ausbilder den Kurs verknüpft hat.
+  // Wir aktualisieren nur einen Timestamp damit der Ausbilder weiß es gibt neue Daten.
+  db.collection('shared').doc('kurse').collection('list').doc(_selectedKursId)
+    .update({ lastTransfer: firebase.firestore.FieldValue.serverTimestamp(), transferredBy: _email })
+    .then(()=> toast('✓ Übertragen! Ausbilder sieht neue Teilnehmer im Pool.'))
+    .catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+// ── Ausbilder E-Mails aus Authentication laden ──
+let _ausbilderEmails = [];
+function loadAusbilderEmails(){
+  // Lese alle User-Dokumente mit role != admin
+  db.collection('users').get().then(snap=>{
+    _ausbilderEmails = [];
+    snap.forEach(doc=>{
+      const d = doc.data();
+      if(d.role !== 'admin' && d.email) _ausbilderEmails.push(d.email);
+    });
+    // Befülle Datalist für Ausbilder-Email-Feld
+    const dl = document.getElementById('ausbilderEmailList');
+    if(dl){ dl.innerHTML = _ausbilderEmails.map(e=>`<option value="${esc(e)}">`).join(''); }
+  }).catch(()=>{});
+}
+
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 let _toastTimer;
 function toast(msg,type){
