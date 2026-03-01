@@ -2189,7 +2189,7 @@ function openPoolLink(){
   sel.innerHTML='<option value="">Lädt…</option>';
   _db.collection('shared').doc('kurse').collection('list')
     .where('ausbilderEmail','==',_auth.currentUser.email.toLowerCase())
-    .orderBy('createdAt','desc').get()
+    .get()
     .then(snap=>{
       sel.innerHTML='<option value="">– Kurs wählen –</option>';
       if(snap.empty){
