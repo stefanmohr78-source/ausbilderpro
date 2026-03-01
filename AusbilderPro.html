@@ -125,9 +125,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .inst-del{background:none;border:none;color:transparent;font-size:.63rem;cursor:pointer;padding:2px 3px;border-radius:3px;transition:color .12s;line-height:1;flex-shrink:0;}
 .inst-row:hover .inst-del{color:var(--mu);}
 .inst-del:hover{color:var(--bad)!important;}
-.inst-docs-btn{background:none;border:none;color:transparent;font-size:.7rem;cursor:pointer;padding:2px 4px;border-radius:3px;transition:color .12s;line-height:1;flex-shrink:0;}
-.inst-row:hover .inst-docs-btn{color:var(--mu);}
+.inst-docs-btn{background:none;border:none;color:var(--mu);font-size:.7rem;cursor:pointer;padding:2px 4px;border-radius:3px;transition:color .12s;line-height:1;flex-shrink:0;}
 .inst-docs-btn:hover{color:var(--acc)!important;}
+.main-dates-row{display:flex;align-items:center;gap:10px;}
+.main-docs-btn{font-size:.65rem!important;padding:3px 9px!important;}
 .kat-newinst{display:none;align-items:center;gap:5px;padding:5px 10px 5px 24px;cursor:pointer;color:var(--acc);font-size:.73rem;font-weight:600;opacity:.7;transition:opacity .12s;flex-shrink:0;}
 .kat-newinst.show{display:flex;}
 .kat-newinst:hover{opacity:1;}
@@ -1020,7 +1021,7 @@ function renderSidebar(){
       const cnt=Object.values(inst.seats||{}).filter(d=>d&&d.name).length;
       const ir=document.createElement('div');
       ir.className='inst-row'+(active?' active':'');
-      ir.innerHTML='<div class="inst-dot"></div><div class="inst-info"><div class="inst-dates">'+esc(instLabel(inst))+'</div>'+(cnt?'<div class="inst-cnt">'+cnt+' Schüler</div>':'')+'</div><button class="inst-docs-btn" onclick="selInstAndOpenDocs(\''+id+'\',\''+iid+'\',event)" title="Kurs-Dokumente">📁</button><button class="inst-del" onclick="delInst(\''+id+'\',\''+iid+'\',event)">✕</button>';
+      ir.innerHTML='<div class="inst-dot"></div><div class="inst-info"><div class="inst-dates">'+esc(instLabel(inst))+'</div>'+(cnt?'<div class="inst-cnt">'+cnt+' Schüler</div>':'')+'</div><button class="inst-del" onclick="delInst(\''+id+'\',\''+iid+'\',event)">✕</button>';
       ir.querySelector('.inst-info').addEventListener('click',()=>selInst(id,iid));
       ir.querySelector('.inst-dot').addEventListener('click',()=>selInst(id,iid));
       ch.appendChild(ir);
@@ -1127,7 +1128,7 @@ function renderMain(){
     return;
   }
   el.innerHTML=
-    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates">'+esc(instLabel(inst))+'</div></div>'
+    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+'</div><button class="tbtn main-docs-btn" onclick="openCourseDocsModal()">📁 Dokumente</button></div></div>'
     +'<button class="tbtn" style="border-color:var(--bad);color:var(--bad)" onclick="clearInstSeats()">⟳ Sitzplan leeren</button></div>'
     +'<div class="seating-wrap"><div class="seating" id="seatingEl"></div></div>'
     +'<div class="tafel">&#9616; Tafel / Lehrerpult &#9612;</div>'
