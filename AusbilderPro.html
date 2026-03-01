@@ -128,6 +128,20 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .inst-docs-btn{background:none;border:none;color:var(--mu);font-size:.7rem;cursor:pointer;padding:2px 4px;border-radius:3px;transition:color .12s;line-height:1;flex-shrink:0;}
 .inst-docs-btn:hover{color:var(--acc)!important;}
 .main-dates-row{display:flex;align-items:center;gap:10px;}
+.main-body-row{display:flex;gap:16px;flex:1;min-height:0;}
+.seating-col{flex:1;min-width:0;display:flex;flex-direction:column;}
+.pool-panel{width:220px;flex-shrink:0;background:var(--sur);border:2px solid var(--brd);border-radius:12px;display:flex;flex-direction:column;overflow:hidden;}
+.pool-hdr{padding:10px 12px;border-bottom:1px solid var(--brd);font-size:.75rem;font-weight:700;display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--sur2);}
+.pool-body{flex:1;overflow-y:auto;padding:8px;}
+.pool-empty{color:var(--mu);font-size:.7rem;text-align:center;padding:20px 10px;}
+.pool-card{background:var(--sur2);border:2px solid var(--brd);border-radius:8px;padding:8px 10px;margin-bottom:5px;cursor:grab;transition:border .12s;user-select:none;}
+.pool-card:hover{border-color:var(--acc);}
+.pool-card.dragging{opacity:.4;border-color:var(--acc);}
+.pool-card.placed{opacity:.4;border-color:var(--ok);border-style:dashed;}
+.pool-name{font-size:.75rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pool-sub{font-size:.6rem;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.seat.pool-target{outline:2px dashed var(--acc);outline-offset:2px;}
+@media(max-width:768px){.pool-panel{width:100%;height:160px;}.main-body-row{flex-direction:column;}}
 .main-docs-btn{font-size:.65rem!important;padding:3px 9px!important;}
 .kat-newinst{display:none;align-items:center;gap:5px;padding:5px 10px 5px 24px;cursor:pointer;color:var(--acc);font-size:.73rem;font-weight:600;opacity:.7;transition:opacity .12s;flex-shrink:0;}
 .kat-newinst.show{display:flex;}
@@ -588,6 +602,27 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div class="dpm-row"><div class="dpm-lbl">Von</div><div class="drow"><select class="dpsel" id="dpSD"><option value="">TT</option></select><span class="dsep">.</span><select class="dpsel" id="dpSM"></select><span class="dsep">.</span><select class="dpsel" id="dpSY"><option value="">JJJJ</option></select></div></div>
       <div class="dpm-row"><div class="dpm-lbl">Bis</div><div class="drow"><select class="dpsel" id="dpED"><option value="">TT</option></select><span class="dsep">.</span><select class="dpsel" id="dpEM"></select><span class="dsep">.</span><select class="dpsel" id="dpEY"><option value="">JJJJ</option></select></div></div>
       <button class="dp-save" onclick="saveNewInst()">💾 Lehrgang anlegen</button>
+    </div>
+  </div>
+</div>
+
+<!-- POOL LINK MODAL -->
+<div class="dpov" id="poolLinkModal" onclick="if(event.target===this)closePoolLink()">
+  <div class="dpm" style="max-width:420px">
+    <div class="dpm-hd">
+      <div class="dpm-tit">🔗 HBZ-Kurs verknüpfen</div>
+      <button class="xcls" onclick="closePoolLink()">✕</button>
+    </div>
+    <div class="dpm-bd">
+      <div style="font-size:.75rem;color:var(--mu);margin-bottom:12px">Wähle einen von der HBZ-Verwaltung angelegten Kurs. Die Teilnehmerliste erscheint dann im Pool.</div>
+      <div class="fg"><label class="fl">HBZ-Kurs auswählen</label>
+        <select class="fi" id="poolKursSelect"><option value="">– Kurs wählen –</option></select>
+      </div>
+      <div id="poolLinkInfo" style="font-size:.7rem;color:var(--mu);margin:8px 0;min-height:18px"></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="tbtn" onclick="savePoolLink()" style="flex:1;background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.3);color:var(--acc)">✓ Verknüpfen</button>
+        <button class="tbtn" onclick="removePoolLink()" style="border-color:rgba(239,68,68,.3);color:var(--bad)">Verknüpfung lösen</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1130,7 +1165,8 @@ function renderMain(){
   el.innerHTML=
     '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+'</div><button class="tbtn main-docs-btn" onclick="openCourseDocsModal()">📁 Dokumente</button></div></div>'
     +'<button class="tbtn" style="border-color:var(--bad);color:var(--bad)" onclick="clearInstSeats()">⟳ Sitzplan leeren</button></div>'
-    +'<div class="seating-wrap"><div class="seating" id="seatingEl"></div></div>'
+    +'<div class="main-body-row">'
+    +'<div class="seating-col"><div class="seating-wrap"><div class="seating" id="seatingEl"></div></div>'
     +'<div class="tafel">&#9616; Tafel / Lehrerpult &#9612;</div>'
     +'<div class="legend">'
     +'<div class="li"><div class="ld" style="background:#34d399"></div>Anwesend</div>'
@@ -1140,8 +1176,14 @@ function renderMain(){
     +'<div class="li"><div class="ld" style="background:#ef4444"></div>Abs. Unentsch.</div>'
     +'<div class="li"><div class="ld" style="background:#fcd34d"></div>Krank</div>'
     +'<div class="li"><div class="ld" style="background:#818cf8"></div>Berufsschule</div>'
+    +'</div></div>'
+    +'<div class="pool-panel" id="poolPanel">'
+    +'<div class="pool-hdr"><span>👥 Teilnehmerpool</span><button class="tbtn" onclick="openPoolLink()" style="font-size:.62rem;padding:3px 8px">🔗 Kurs verknüpfen</button></div>'
+    +'<div class="pool-body" id="poolBody"><div class="pool-empty">Kein Kurs verknüpft</div></div>'
+    +'</div>'
     +'</div>';
   renderSeats();
+  loadPool();
 }
 
 function getRows(inst){
@@ -2041,6 +2083,145 @@ function _pwHash(s){
   h2=Math.imul(h2^(h2>>>16),0x45d9f3b)^Math.imul(h1^(h1>>>13),0x45d9f3b);
   return (((h2>>>0).toString(16).padStart(8,'0'))+((h1>>>0).toString(16).padStart(8,'0')));
 }
+// ═══════════════════════════════════════════════
+// TEILNEHMERPOOL (HBZ-Verknüpfung)
+// ═══════════════════════════════════════════════
+let _poolDragId = null;
+
+function loadPool(){
+  const inst = curInst();
+  if(!inst) return;
+  const kursId = inst.sharedKursId;
+  const body = document.getElementById('poolBody');
+  if(!body) return;
+  if(!kursId){
+    body.innerHTML='<div class="pool-empty">Kein Kurs verknüpft.<br><span style="color:var(--acc);cursor:pointer" onclick="openPoolLink()">→ Jetzt verknüpfen</span></div>';
+    return;
+  }
+  if(!_db){ body.innerHTML='<div class="pool-empty">Nicht eingeloggt</div>'; return; }
+  body.innerHTML='<div class="pool-empty">Lädt…</div>';
+  _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+    .collection('teilnehmer').orderBy('nachname').get()
+    .then(snap=>{
+      if(snap.empty){ body.innerHTML='<div class="pool-empty">Keine Teilnehmer im Kurs</div>'; return; }
+      // Welche Namen sind schon platziert?
+      const seats = curSeats();
+      const placed = new Set(Object.values(seats).filter(d=>d&&d.name).map(d=>d.name.trim().toLowerCase()));
+      body.innerHTML='';
+      snap.forEach(doc=>{
+        const d=doc.data();
+        const fullName = (d.vorname+' '+d.nachname).trim();
+        const isPlaced = placed.has(fullName.toLowerCase());
+        const card = document.createElement('div');
+        card.className='pool-card'+(isPlaced?' placed':'');
+        card.draggable=!isPlaced;
+        card.dataset.name=fullName;
+        card.dataset.company=d.firma||'';
+        card.dataset.profession=d.beruf||'';
+        card.dataset.ausbjahr=d.ausbjahr||'';
+        card.innerHTML='<div class="pool-name">'+esc(fullName)+'</div>'
+          +'<div class="pool-sub">'+(isPlaced?'✓ Platziert':esc(d.firma||d.beruf||''))+'</div>';
+        card.addEventListener('dragstart',e=>{
+          _poolDragId=fullName;
+          card.classList.add('dragging');
+          e.dataTransfer.effectAllowed='copy';
+        });
+        card.addEventListener('dragend',()=>card.classList.remove('dragging'));
+        body.appendChild(card);
+      });
+      // Seats als Drop-Ziele
+      setupSeatDropTargets();
+    }).catch(()=>{body.innerHTML='<div class="pool-empty">Fehler beim Laden</div>';});
+}
+
+function setupSeatDropTargets(){
+  document.querySelectorAll('.seat').forEach(el=>{
+    el.addEventListener('dragover',e=>{
+      e.preventDefault();
+      el.classList.add('pool-target');
+    });
+    el.addEventListener('dragleave',()=>el.classList.remove('pool-target'));
+    el.addEventListener('drop',e=>{
+      e.preventDefault();
+      el.classList.remove('pool-target');
+      if(!_poolDragId) return;
+      const id=el.id.replace('seat-','');
+      const inst=curInst();
+      if(!inst) return;
+      const existing=inst.seats[id]||{};
+      // Finde Kartendaten
+      const card=document.querySelector('.pool-card[data-name="'+_poolDragId.replace(/"/g,'&quot;')+'"]');
+      inst.seats[id]={
+        ...existing,
+        name:_poolDragId,
+        company:card?card.dataset.company:'',
+        profession:card?card.dataset.profession:'',
+        ausbjahr:card?card.dataset.ausbjahr:'',
+      };
+      persist();
+      renderSeats();
+      loadPool();
+      _poolDragId=null;
+    });
+  });
+}
+
+function openPoolLink(){
+  if(!_db){ return; }
+  const modal=document.getElementById('poolLinkModal');
+  const sel=document.getElementById('poolKursSelect');
+  sel.innerHTML='<option value="">Lädt…</option>';
+  _db.collection('shared').doc('kurse').collection('list')
+    .orderBy('createdAt','desc').get()
+    .then(snap=>{
+      sel.innerHTML='<option value="">– Kurs wählen –</option>';
+      snap.forEach(doc=>{
+        const d=doc.data();
+        const o=document.createElement('option');
+        o.value=doc.id;
+        o.textContent=d.name+(d.von?' ('+d.von+')':'');
+        sel.appendChild(o);
+      });
+      // Aktuell verknüpften Kurs vorauswählen
+      const inst=curInst();
+      if(inst&&inst.sharedKursId) sel.value=inst.sharedKursId;
+      updatePoolLinkInfo();
+    });
+  sel.onchange=updatePoolLinkInfo;
+  modal.classList.add('open');
+}
+
+function updatePoolLinkInfo(){
+  const sel=document.getElementById('poolKursSelect');
+  const info=document.getElementById('poolLinkInfo');
+  if(!sel.value){ info.textContent=''; return; }
+  _db.collection('shared').doc('kurse').collection('list').doc(sel.value)
+    .collection('teilnehmer').get()
+    .then(snap=>{ info.textContent=snap.size+' Teilnehmer in diesem Kurs'; });
+}
+
+function savePoolLink(){
+  const kursId=document.getElementById('poolKursSelect').value;
+  if(!kursId) return;
+  const inst=curInst();
+  if(!inst) return;
+  inst.sharedKursId=kursId;
+  persist();
+  closePoolLink();
+  loadPool();
+}
+
+function removePoolLink(){
+  const inst=curInst();
+  if(!inst) return;
+  delete inst.sharedKursId;
+  persist();
+  closePoolLink();
+  loadPool();
+}
+
+function closePoolLink(){ document.getElementById('poolLinkModal').classList.remove('open'); }
+
 // ═══════════════════════════════════════════════
 // DOKUMENTE (Firebase Storage)
 // ═══════════════════════════════════════════════

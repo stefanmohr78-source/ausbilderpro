@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HBZ Verwaltung</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<style>
+:root{
+  --bg:#0f1117;--sur:#161922;--sur2:#1e2433;--brd:#2a3050;
+  --tx:#e8eaf0;--mu:#6b7a9a;--acc:#3b82f6;--acc2:#60a5fa;
+  --ok:#22c55e;--bad:#ef4444;--warn:#f59e0b;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;}
+
+/* LOGIN */
+#loginWrap{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+.login-box{background:var(--sur);border:2px solid var(--brd);border-radius:18px;padding:40px 36px;width:100%;max-width:360px;box-shadow:0 24px 80px rgba(0,0,0,.7);}
+.login-logo{font-size:1.4rem;font-weight:800;text-align:center;margin-bottom:4px;}
+.login-logo span{color:var(--acc)}
+.login-sub{font-size:.72rem;color:var(--mu);text-align:center;font-family:'JetBrains Mono',monospace;margin-bottom:28px;}
+.login-badge{display:inline-block;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);color:var(--acc);font-size:.6rem;font-family:'JetBrains Mono',monospace;padding:3px 10px;border-radius:20px;margin-bottom:16px;width:100%;text-align:center;}
+.fi{width:100%;background:var(--sur2);border:2px solid var(--brd);border-radius:9px;padding:11px 14px;color:var(--tx);font-family:'Sora',sans-serif;font-size:.85rem;outline:none;transition:border .15s;}
+.fi:focus{border-color:var(--acc);}
+.fg{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;}
+.fl{font-size:.72rem;color:var(--mu);font-weight:600;}
+.btn{width:100%;padding:12px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);border:none;border-radius:9px;color:#fff;font-family:'Sora',sans-serif;font-size:.87rem;font-weight:700;cursor:pointer;transition:all .15s;}
+.btn:hover{transform:translateY(-1px);box-shadow:0 6px 22px rgba(59,130,246,.35);}
+.err{color:var(--bad);font-size:.72rem;text-align:center;min-height:18px;}
+
+/* APP LAYOUT */
+#appWrap{display:none;flex-direction:column;min-height:100vh;}
+.hdr{display:flex;align-items:center;gap:14px;padding:0 24px;height:54px;background:var(--sur);border-bottom:1px solid var(--brd);position:sticky;top:0;z-index:100;}
+.hdr-logo{font-size:1rem;font-weight:800;}
+.hdr-logo span{color:var(--acc)}
+.hdr-badge{background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25);color:var(--acc);font-size:.58rem;font-family:'JetBrains Mono',monospace;padding:2px 9px;border-radius:12px;}
+.hdr-sep{flex:1}
+.hdr-user{font-size:.7rem;color:var(--mu);font-family:'JetBrains Mono',monospace;}
+.hdr-btn{background:var(--sur2);border:1px solid var(--brd);border-radius:7px;color:var(--tx);font-family:'Sora',sans-serif;font-size:.72rem;padding:6px 12px;cursor:pointer;transition:all .12s;}
+.hdr-btn:hover{border-color:var(--acc);color:var(--acc);}
+
+.body{display:flex;flex:1;}
+
+/* SIDEBAR */
+.sb{width:260px;background:var(--sur);border-right:1px solid var(--brd);display:flex;flex-direction:column;padding:16px 12px;gap:6px;overflow-y:auto;flex-shrink:0;}
+.sb-sec{font-size:.6rem;font-family:'JetBrains Mono',monospace;color:var(--mu);text-transform:uppercase;letter-spacing:.1em;padding:8px 8px 4px;}
+.nav-btn{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;cursor:pointer;font-size:.82rem;font-weight:600;color:var(--mu);border:none;background:none;width:100%;text-align:left;transition:all .12s;}
+.nav-btn:hover{background:var(--sur2);color:var(--tx);}
+.nav-btn.active{background:rgba(59,130,246,.12);color:var(--acc);border:1px solid rgba(59,130,246,.2);}
+.nav-icon{font-size:1rem;width:22px;text-align:center;}
+
+/* MAIN */
+.main{flex:1;padding:24px;overflow-y:auto;}
+.page{display:none;}
+.page.active{display:block;}
+.page-title{font-size:1.3rem;font-weight:800;margin-bottom:4px;}
+.page-sub{font-size:.75rem;color:var(--mu);margin-bottom:24px;}
+
+/* CARDS */
+.card{background:var(--sur);border:2px solid var(--brd);border-radius:13px;padding:20px;}
+.card+.card{margin-top:14px;}
+.card-title{font-size:.9rem;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+
+/* GRID */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+@media(max-width:900px){.grid2,.grid3{grid-template-columns:1fr;}}
+
+/* STAT */
+.stat-card{background:var(--sur);border:2px solid var(--brd);border-radius:13px;padding:18px;display:flex;flex-direction:column;gap:4px;}
+.stat-num{font-size:1.8rem;font-weight:800;color:var(--acc);font-family:'JetBrains Mono',monospace;}
+.stat-label{font-size:.72rem;color:var(--mu);}
+
+/* KURS LIST */
+.kurs-item{background:var(--sur2);border:2px solid var(--brd);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px;margin-bottom:8px;cursor:pointer;transition:border .12s;}
+.kurs-item:hover{border-color:var(--acc);}
+.kurs-item.selected{border-color:var(--acc);background:rgba(59,130,246,.06);}
+.kurs-dot{width:8px;height:8px;border-radius:50%;background:var(--acc);flex-shrink:0;}
+.kurs-info{flex:1;}
+.kurs-name{font-size:.85rem;font-weight:700;}
+.kurs-meta{font-size:.65rem;color:var(--mu);font-family:'JetBrains Mono',monospace;}
+.kurs-cnt{font-size:.65rem;color:var(--acc);font-family:'JetBrains Mono',monospace;}
+.kurs-del{background:none;border:none;color:transparent;cursor:pointer;font-size:.75rem;padding:4px 6px;border-radius:5px;transition:color .12s;}
+.kurs-item:hover .kurs-del{color:var(--mu);}
+.kurs-del:hover{color:var(--bad)!important;}
+
+/* TEILNEHMER */
+.tn-item{background:var(--sur2);border:2px solid var(--brd);border-radius:9px;padding:11px 14px;display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+.tn-avatar{width:34px;height:34px;border-radius:50%;background:rgba(59,130,246,.15);border:2px solid rgba(59,130,246,.3);display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;color:var(--acc);flex-shrink:0;}
+.tn-info{flex:1;min-width:0;}
+.tn-name{font-size:.82rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tn-sub{font-size:.62rem;color:var(--mu);}
+.tn-del{background:none;border:none;color:var(--mu);cursor:pointer;font-size:.75rem;padding:4px 6px;border-radius:5px;transition:color .12s;}
+.tn-del:hover{color:var(--bad);}
+
+/* DOKUMENT */
+.doc-item{background:var(--sur2);border:2px solid var(--brd);border-radius:9px;padding:10px 14px;display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+.doc-icon{font-size:1.2rem;flex-shrink:0;}
+.doc-info{flex:1;min-width:0;}
+.doc-name{font-size:.78rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.doc-meta{font-size:.62rem;color:var(--mu);}
+.doc-open{color:var(--acc);font-size:.7rem;background:none;border:1px solid var(--acc);border-radius:5px;padding:3px 8px;cursor:pointer;}
+.doc-del{background:none;border:none;color:var(--mu);cursor:pointer;font-size:.75rem;padding:3px 6px;}
+.doc-del:hover{color:var(--bad);}
+
+/* FORM */
+.form-row{display:flex;gap:10px;margin-bottom:10px;}
+.form-row .fg{flex:1;}
+.btn-sm{padding:8px 14px;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);border-radius:8px;color:var(--acc);font-family:'Sora',sans-serif;font-size:.75rem;font-weight:600;cursor:pointer;transition:all .12s;}
+.btn-sm:hover{background:rgba(59,130,246,.2);}
+.btn-ok{background:linear-gradient(135deg,#1d4ed8,#3b82f6);border:none;color:#fff;}
+.btn-ok:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(59,130,246,.3);}
+.btn-bad{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--bad);}
+.divider{border:none;border-top:1px solid var(--brd);margin:16px 0;}
+.xcls{background:none;border:none;color:var(--mu);font-size:1rem;cursor:pointer;padding:4px 8px;border-radius:5px;}
+.xcls:hover{color:var(--tx);}
+.empty{color:var(--mu);font-size:.75rem;text-align:center;padding:24px;font-family:'JetBrains Mono',monospace;}
+
+/* MODAL */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(3px);z-index:200;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .17s;}
+.ov.open{opacity:1;pointer-events:all;}
+.modal{background:var(--sur);border:2px solid var(--brd);border-radius:14px;width:100%;max-width:500px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.6);transform:translateY(14px);transition:transform .17s;}
+.ov.open .modal{transform:none;}
+.mhd{display:flex;align-items:center;justify-content:space-between;padding:15px 19px;border-bottom:1px solid var(--brd);position:sticky;top:0;background:var(--sur);z-index:2;}
+.mtit{font-size:.95rem;font-weight:700;}
+.mbdy{padding:18px 19px;}
+
+/* CSV PREVIEW */
+.csv-preview{background:var(--sur2);border:2px solid var(--brd);border-radius:8px;max-height:200px;overflow-y:auto;margin-top:10px;}
+.csv-row{display:flex;gap:8px;padding:6px 10px;border-bottom:1px solid var(--brd);font-size:.7rem;font-family:'JetBrains Mono',monospace;}
+.csv-row:last-child{border-bottom:none;}
+.csv-head{background:rgba(59,130,246,.08);font-weight:700;color:var(--acc);}
+
+/* TABS */
+.tabs{display:flex;gap:4px;margin-bottom:16px;background:var(--sur2);border-radius:9px;padding:3px;}
+.tab{flex:1;padding:7px 10px;border:none;background:none;color:var(--mu);font-family:'Sora',sans-serif;font-size:.75rem;font-weight:600;cursor:pointer;border-radius:7px;transition:all .12s;}
+.tab.active{background:var(--sur);color:var(--tx);box-shadow:0 1px 6px rgba(0,0,0,.3);}
+.tp{display:none;}
+.tp.active{display:block;}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--sur);border:2px solid var(--ok);border-radius:10px;padding:12px 18px;font-size:.8rem;font-weight:600;color:var(--ok);z-index:999;transform:translateY(60px);opacity:0;transition:all .25s;}
+.toast.show{transform:none;opacity:1;}
+
+/* UPLOAD AREA */
+.upload-area{border:2px dashed var(--brd);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:border .15s;font-size:.78rem;color:var(--mu);}
+.upload-area:hover{border-color:var(--acc);color:var(--acc);}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginWrap">
+  <div class="login-box">
+    <div class="login-logo">HBZ<span>Verwaltung</span></div>
+    <div class="login-sub">Internes Verwaltungsportal</div>
+    <div class="login-badge">🔒 NUR FÜR AUTORISIERTE MITARBEITER</div>
+    <div class="fg"><label class="fl">E-Mail</label><input class="fi" type="email" id="lEmail" placeholder="name@hbz.de"></div>
+    <div class="fg"><label class="fl">Passwort</label><input class="fi" type="password" id="lPw" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="err" id="lErr"></div>
+    <button class="btn" onclick="doLogin()" style="margin-top:8px">Anmelden</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appWrap">
+  <div class="hdr">
+    <div class="hdr-logo">HBZ<span>Verwaltung</span></div>
+    <div class="hdr-badge">ADMIN PORTAL</div>
+    <div class="hdr-sep"></div>
+    <div class="hdr-user" id="hdrUser"></div>
+    <button class="hdr-btn" onclick="doLogout()">⎋ Abmelden</button>
+  </div>
+  <div class="body">
+    <!-- SIDEBAR NAV -->
+    <div class="sb">
+      <div class="sb-sec">Navigation</div>
+      <button class="nav-btn active" onclick="showPage('dashboard')" id="nav-dashboard">
+        <span class="nav-icon">📊</span>Dashboard
+      </button>
+      <button class="nav-btn" onclick="showPage('kurse')" id="nav-kurse">
+        <span class="nav-icon">📚</span>Kurse
+      </button>
+      <button class="nav-btn" onclick="showPage('teilnehmer')" id="nav-teilnehmer">
+        <span class="nav-icon">👥</span>Teilnehmer
+      </button>
+      <button class="nav-btn" onclick="showPage('dokumente')" id="nav-dokumente">
+        <span class="nav-icon">📁</span>Dokumente
+      </button>
+    </div>
+
+    <!-- PAGES -->
+    <div class="main">
+
+      <!-- DASHBOARD -->
+      <div class="page active" id="page-dashboard">
+        <div class="page-title">Dashboard</div>
+        <div class="page-sub">Übersicht aller Kurse und Aktivitäten</div>
+        <div class="grid3" id="statsGrid">
+          <div class="stat-card"><div class="stat-num" id="statKurse">–</div><div class="stat-label">Kurse gesamt</div></div>
+          <div class="stat-card"><div class="stat-num" id="statTN">–</div><div class="stat-label">Teilnehmer gesamt</div></div>
+          <div class="stat-card"><div class="stat-num" id="statDocs">–</div><div class="stat-label">Dokumente hochgeladen</div></div>
+        </div>
+        <div style="margin-top:20px">
+          <div class="card">
+            <div class="card-title">📚 Letzte Kurse</div>
+            <div id="dashKursList"><div class="empty">Lädt…</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KURSE -->
+      <div class="page" id="page-kurse">
+        <div class="page-title">Kurse</div>
+        <div class="page-sub">Kurse erstellen und verwalten</div>
+        <div class="grid2">
+          <div>
+            <div class="card">
+              <div class="card-title">➕ Neuer Kurs</div>
+              <div class="fg"><label class="fl">Kursname / Lehrgangsbezeichnung</label><input class="fi" id="newKursName" placeholder="z.B. Elektroniker EuG 2024"></div>
+              <div class="form-row">
+                <div class="fg"><label class="fl">Von</label><input class="fi" type="date" id="newKursVon"></div>
+                <div class="fg"><label class="fl">Bis</label><input class="fi" type="date" id="newKursBis"></div>
+              </div>
+              <div class="fg"><label class="fl">Verantwortlicher Ausbilder (optional)</label><input class="fi" id="newKursAusbilder" placeholder="Name des Ausbilders"></div>
+              <button class="btn-sm btn-ok" onclick="createKurs()" style="width:100%;margin-top:6px">✓ Kurs erstellen</button>
+            </div>
+          </div>
+          <div>
+            <div class="card" style="max-height:500px;overflow-y:auto">
+              <div class="card-title">📚 Alle Kurse <span id="kursCnt" style="font-size:.7rem;color:var(--mu);font-weight:400"></span></div>
+              <div id="kursList"><div class="empty">Lädt…</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TEILNEHMER -->
+      <div class="page" id="page-teilnehmer">
+        <div class="page-title">Teilnehmer</div>
+        <div class="page-sub">Teilnehmer einem Kurs zuweisen</div>
+
+        <!-- Kurs auswählen -->
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-title">📚 Kurs auswählen</div>
+          <select class="fi" id="tnKursSelect" onchange="loadTeilnehmer()">
+            <option value="">– Kurs wählen –</option>
+          </select>
+        </div>
+
+        <div id="tnArea" style="display:none">
+          <div class="grid2">
+            <div>
+              <div class="card">
+                <div class="card-title">👤 Teilnehmer hinzufügen</div>
+                <div class="tabs">
+                  <button class="tab active" onclick="stntab('manuell')">✏️ Manuell</button>
+                  <button class="tab" onclick="stntab('csv')">📊 CSV / Excel</button>
+                </div>
+                <div class="tp active" id="tp-manuell">
+                  <div class="form-row">
+                    <div class="fg"><label class="fl">Vorname</label><input class="fi" id="tnVorname" placeholder="Max"></div>
+                    <div class="fg"><label class="fl">Nachname</label><input class="fi" id="tnNachname" placeholder="Mustermann"></div>
+                  </div>
+                  <div class="fg"><label class="fl">Ausbildungsbetrieb</label><input class="fi" id="tnFirma" placeholder="Firma GmbH"></div>
+                  <div class="form-row">
+                    <div class="fg"><label class="fl">Beruf</label><input class="fi" id="tnBeruf" placeholder="Elektroniker EuG"></div>
+                    <div class="fg"><label class="fl">Ausbildungsjahr</label>
+                      <select class="fi" id="tnAusbjahr">
+                        <option value="">–</option>
+                        <option value="1">1. Jahr</option>
+                        <option value="2">2. Jahr</option>
+                        <option value="3">3. Jahr</option>
+                        <option value="4">4. Jahr</option>
+                      </select>
+                    </div>
+                  </div>
+                  <button class="btn-sm btn-ok" onclick="addTeilnehmer()" style="width:100%;margin-top:6px">+ Teilnehmer hinzufügen</button>
+                </div>
+                <div class="tp" id="tp-csv">
+                  <div style="font-size:.72rem;color:var(--mu);margin-bottom:10px">
+                    CSV-Format: <code style="background:var(--sur2);padding:2px 6px;border-radius:4px">Vorname;Nachname;Firma;Beruf;Ausbildungsjahr</code>
+                  </div>
+                  <div class="upload-area" onclick="document.getElementById('csvFileIn').click()">
+                    📊 CSV oder Excel-Datei hierher ziehen oder klicken
+                  </div>
+                  <input type="file" id="csvFileIn" accept=".csv,.xlsx,.xls,.txt" style="display:none" onchange="handleCSV(event)">
+                  <div id="csvPreview"></div>
+                  <button class="btn-sm btn-ok" id="csvImportBtn" onclick="importCSV()" style="width:100%;margin-top:8px;display:none">✓ Alle importieren</button>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="card" style="max-height:500px;overflow-y:auto">
+                <div class="card-title">👥 Teilnehmerliste <span id="tnCnt" style="font-size:.7rem;color:var(--mu);font-weight:400"></span></div>
+                <div id="tnList"><div class="empty">Noch keine Teilnehmer</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DOKUMENTE -->
+      <div class="page" id="page-dokumente">
+        <div class="page-title">Dokumente</div>
+        <div class="page-sub">Unterlagen für Kurse hochladen</div>
+
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-title">📚 Kurs auswählen</div>
+          <select class="fi" id="docsKursSelect" onchange="loadKursDocs()">
+            <option value="">– Kurs wählen –</option>
+          </select>
+        </div>
+
+        <div id="docsArea" style="display:none">
+          <div class="grid2">
+            <div>
+              <div class="card">
+                <div class="card-title">⬆ Dokument hochladen</div>
+                <div class="upload-area" onclick="document.getElementById('docFileIn').click()">
+                  📎 Datei hierher ziehen oder klicken<br>
+                  <span style="font-size:.65rem">PDF, Bilder, Word, Excel – max. 20 MB</span>
+                </div>
+                <input type="file" id="docFileIn" style="display:none" onchange="uploadKursDoc(event)">
+                <div id="docUploadProgress" style="margin-top:8px"></div>
+              </div>
+            </div>
+            <div>
+              <div class="card" style="max-height:500px;overflow-y:auto">
+                <div class="card-title">📁 Hochgeladene Dokumente</div>
+                <div id="docsList"><div class="empty">Noch keine Dokumente</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /main -->
+  </div><!-- /body -->
+</div><!-- /appWrap -->
+
+<!-- KURS DETAIL MODAL -->
+<div class="ov" id="kursModal" onclick="if(event.target===this)closeKursModal()">
+  <div class="modal">
+    <div class="mhd"><div class="mtit" id="kursModalTitle">Kurs</div><button class="xcls" onclick="closeKursModal()">✕</button></div>
+    <div class="mbdy">
+      <div id="kursModalBody"></div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Firebase ──
+const FB_CFG = {
+  apiKey:"AIzaSyCI5hJLj22FTiAJoVIPis7VhoQqJiMLAZQ",
+  authDomain:"ausbilderpro.firebaseapp.com",
+  projectId:"ausbilderpro",
+  storageBucket:"ausbilderpro.firebasestorage.app",
+  messagingSenderId:"937082794250",
+  appId:"1:937082794250:web:eb99bc41d8f39908df8af3"
+};
+firebase.initializeApp(FB_CFG);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+const st   = firebase.storage();
+
+let _uid = null;
+let _email = null;
+let _kurse = [];
+let _csvData = [];
+let _selectedKursId = null;
+
+// ── Auth ──
+auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(()=>{});
+auth.onAuthStateChanged(u => {
+  if(u){
+    _uid = u.uid;
+    _email = u.email;
+    // Admin-Check
+    db.collection('users').doc(_uid).get().then(doc => {
+      const role = doc.exists ? doc.data().role : null;
+      if(role !== 'admin'){
+        auth.signOut();
+        showErr('Kein Zugriff. Bitte Admin kontaktieren.');
+        return;
+      }
+      document.getElementById('loginWrap').style.display = 'none';
+      document.getElementById('appWrap').style.display = 'flex';
+      document.getElementById('hdrUser').textContent = _email;
+      loadAll();
+    });
+  } else {
+    _uid = null;
+    document.getElementById('loginWrap').style.display = 'flex';
+    document.getElementById('appWrap').style.display = 'none';
+  }
+});
+
+function doLogin(){
+  const e = document.getElementById('lEmail').value.trim();
+  const p = document.getElementById('lPw').value;
+  showErr('');
+  auth.signInWithEmailAndPassword(e,p).catch(err=>{
+    const map = {'auth/user-not-found':'E-Mail oder Passwort falsch.','auth/wrong-password':'E-Mail oder Passwort falsch.','auth/invalid-email':'Ungültige E-Mail Adresse.'};
+    showErr(map[err.code]||err.message);
+  });
+}
+function doLogout(){ auth.signOut(); }
+function showErr(m){ document.getElementById('lErr').textContent = m; }
+
+// ── Navigation ──
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  document.getElementById('nav-'+id).classList.add('active');
+  if(id==='dashboard') loadDashboard();
+  if(id==='kurse') renderKursList();
+  if(id==='teilnehmer') populateKursSelects();
+  if(id==='dokumente') populateKursSelects();
+}
+
+// ── Load All ──
+function loadAll(){
+  db.collection('shared').doc('kurse').collection('list')
+    .orderBy('createdAt','desc').onSnapshot(snap=>{
+      _kurse = [];
+      snap.forEach(doc=>_kurse.push({id:doc.id,...doc.data()}));
+      renderKursList();
+      populateKursSelects();
+      loadDashboard();
+    });
+}
+
+// ── Dashboard ──
+function loadDashboard(){
+  document.getElementById('statKurse').textContent = _kurse.length;
+  let tnTotal = 0, docTotal = 0;
+  const promises = _kurse.map(k =>
+    db.collection('shared').doc('kurse').collection('list').doc(k.id).collection('teilnehmer').get()
+      .then(s=>{ tnTotal+=s.size; })
+  );
+  Promise.all(promises).then(()=>{
+    document.getElementById('statTN').textContent = tnTotal;
+    document.getElementById('statDocs').textContent = '–';
+  });
+
+  const dl = document.getElementById('dashKursList');
+  if(!_kurse.length){ dl.innerHTML='<div class="empty">Noch keine Kurse</div>'; return; }
+  dl.innerHTML = _kurse.slice(0,5).map(k=>`
+    <div class="kurs-item" onclick="showPage('teilnehmer');setTimeout(()=>{document.getElementById('tnKursSelect').value='${k.id}';loadTeilnehmer();},100)">
+      <div class="kurs-dot"></div>
+      <div class="kurs-info">
+        <div class="kurs-name">${esc(k.name)}</div>
+        <div class="kurs-meta">${k.von||'?'} – ${k.bis||'?'}${k.ausbilder?' · '+esc(k.ausbilder):''}</div>
+      </div>
+      <div class="kurs-cnt">→</div>
+    </div>`).join('');
+}
+
+// ── Kurse ──
+function createKurs(){
+  const name = document.getElementById('newKursName').value.trim();
+  if(!name){ toast('Bitte Kursname eingeben','bad'); return; }
+  const von  = document.getElementById('newKursVon').value;
+  const bis  = document.getElementById('newKursBis').value;
+  const ausb = document.getElementById('newKursAusbilder').value.trim();
+  db.collection('shared').doc('kurse').collection('list').add({
+    name, von, bis, ausbilder:ausb, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: _uid
+  }).then(()=>{
+    document.getElementById('newKursName').value='';
+    document.getElementById('newKursVon').value='';
+    document.getElementById('newKursBis').value='';
+    document.getElementById('newKursAusbilder').value='';
+    toast('Kurs erstellt ✓');
+  });
+}
+
+function renderKursList(){
+  const el = document.getElementById('kursList');
+  document.getElementById('kursCnt').textContent = '('+_kurse.length+')';
+  if(!_kurse.length){ el.innerHTML='<div class="empty">Noch keine Kurse</div>'; return; }
+  el.innerHTML = _kurse.map(k=>`
+    <div class="kurs-item">
+      <div class="kurs-dot"></div>
+      <div class="kurs-info">
+        <div class="kurs-name">${esc(k.name)}</div>
+        <div class="kurs-meta">${k.von||'?'} – ${k.bis||'?'}${k.ausbilder?' · '+esc(k.ausbilder):''}</div>
+        <div class="kurs-cnt" id="kcnt-${k.id}">…</div>
+      </div>
+      <button class="kurs-del" onclick="deleteKurs('${k.id}',event)">🗑</button>
+    </div>`).join('');
+  // Load teilnehmer counts
+  _kurse.forEach(k=>{
+    db.collection('shared').doc('kurse').collection('list').doc(k.id).collection('teilnehmer').get()
+      .then(s=>{ const el2=document.getElementById('kcnt-'+k.id); if(el2)el2.textContent=s.size+' Teilnehmer'; });
+  });
+}
+
+function deleteKurs(id,e){
+  e.stopPropagation();
+  if(!confirm('Kurs wirklich löschen? Alle Teilnehmer und Dokumente werden ebenfalls gelöscht!')) return;
+  db.collection('shared').doc('kurse').collection('list').doc(id).delete().then(()=>toast('Kurs gelöscht'));
+}
+
+// ── Kurs Selects befüllen ──
+function populateKursSelects(){
+  ['tnKursSelect','docsKursSelect'].forEach(sid=>{
+    const sel = document.getElementById(sid);
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">– Kurs wählen –</option>';
+    _kurse.forEach(k=>{ const o=document.createElement('option'); o.value=k.id; o.textContent=k.name+(k.von?' ('+k.von+')':''); sel.appendChild(o); });
+    if(cur) sel.value = cur;
+  });
+}
+
+// ── Teilnehmer ──
+function stntab(t){
+  document.querySelectorAll('#tp-manuell,#tp-csv').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('#page-teilnehmer .tab').forEach(x=>x.classList.remove('active'));
+  document.getElementById('tp-'+t).classList.add('active');
+  document.querySelector('#page-teilnehmer .tab[onclick="stntab(\''+t+'\')"]').classList.add('active');
+}
+
+function loadTeilnehmer(){
+  const kursId = document.getElementById('tnKursSelect').value;
+  if(!kursId){ document.getElementById('tnArea').style.display='none'; return; }
+  document.getElementById('tnArea').style.display='block';
+  _selectedKursId = kursId;
+  renderTeilnehmer(kursId);
+}
+
+function renderTeilnehmer(kursId){
+  const el = document.getElementById('tnList');
+  el.innerHTML = '<div class="empty">Lädt…</div>';
+  db.collection('shared').doc('kurse').collection('list').doc(kursId)
+    .collection('teilnehmer').orderBy('nachname').get()
+    .then(snap=>{
+      document.getElementById('tnCnt').textContent = '('+snap.size+')';
+      if(snap.empty){ el.innerHTML='<div class="empty">Noch keine Teilnehmer</div>'; return; }
+      el.innerHTML='';
+      snap.forEach(doc=>{
+        const d=doc.data();
+        const initials = ((d.vorname||'?')[0]+(d.nachname||'?')[0]).toUpperCase();
+        const item = document.createElement('div');
+        item.className='tn-item';
+        item.innerHTML=`<div class="tn-avatar">${initials}</div>
+          <div class="tn-info">
+            <div class="tn-name">${esc(d.vorname)} ${esc(d.nachname)}</div>
+            <div class="tn-sub">${esc(d.firma||'')}${d.beruf?' · '+esc(d.beruf):''}${d.ausbjahr?' · '+d.ausbjahr+'. Jahr':''}</div>
+          </div>
+          <button class="tn-del" onclick="deleteTN('${doc.id}','${kursId}')">🗑</button>`;
+        el.appendChild(item);
+      });
+    });
+}
+
+function addTeilnehmer(){
+  const kursId = _selectedKursId;
+  if(!kursId) return;
+  const vn = document.getElementById('tnVorname').value.trim();
+  const nn = document.getElementById('tnNachname').value.trim();
+  if(!vn||!nn){ toast('Vor- und Nachname erforderlich','bad'); return; }
+  db.collection('shared').doc('kurse').collection('list').doc(kursId)
+    .collection('teilnehmer').add({
+      vorname:vn, nachname:nn,
+      firma:document.getElementById('tnFirma').value.trim(),
+      beruf:document.getElementById('tnBeruf').value.trim(),
+      ausbjahr:document.getElementById('tnAusbjahr').value,
+      addedAt:Date.now()
+    }).then(()=>{
+      document.getElementById('tnVorname').value='';
+      document.getElementById('tnNachname').value='';
+      document.getElementById('tnFirma').value='';
+      document.getElementById('tnBeruf').value='';
+      renderTeilnehmer(kursId);
+      toast('Teilnehmer hinzugefügt ✓');
+    });
+}
+
+function deleteTN(tnId,kursId){
+  if(!confirm('Teilnehmer wirklich löschen?')) return;
+  db.collection('shared').doc('kurse').collection('list').doc(kursId)
+    .collection('teilnehmer').doc(tnId).delete()
+    .then(()=>{ renderTeilnehmer(kursId); toast('Gelöscht'); });
+}
+
+// ── CSV Import ──
+function handleCSV(e){
+  const file=e.target.files[0];
+  if(!file) return;
+  e.target.value='';
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const text=ev.target.result;
+    const lines=text.split('\n').map(l=>l.trim()).filter(l=>l);
+    _csvData=[];
+    const preview=document.getElementById('csvPreview');
+    preview.innerHTML='<div class="csv-preview"><div class="csv-row csv-head"><span>Vorname</span><span>Nachname</span><span>Firma</span><span>Beruf</span><span>Jahr</span></div></div>';
+    const table=preview.querySelector('.csv-preview');
+    lines.forEach((line,i)=>{
+      const cols=line.split(/[;,\t]/).map(c=>c.trim().replace(/^["']|["']$/g,''));
+      if(cols.length<2) return;
+      const row={vorname:cols[0]||'',nachname:cols[1]||'',firma:cols[2]||'',beruf:cols[3]||'',ausbjahr:cols[4]||''};
+      _csvData.push(row);
+      const div=document.createElement('div');
+      div.className='csv-row';
+      div.innerHTML=`<span>${esc(row.vorname)}</span><span>${esc(row.nachname)}</span><span>${esc(row.firma)}</span><span>${esc(row.beruf)}</span><span>${esc(row.ausbjahr)}</span>`;
+      table.appendChild(div);
+    });
+    document.getElementById('csvImportBtn').style.display=_csvData.length?'':'none';
+    document.getElementById('csvImportBtn').textContent='✓ '+_csvData.length+' Teilnehmer importieren';
+  };
+  reader.readAsText(file,'UTF-8');
+}
+
+function importCSV(){
+  const kursId=_selectedKursId;
+  if(!kursId||!_csvData.length) return;
+  const batch=db.batch();
+  _csvData.forEach(row=>{
+    const ref=db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc();
+    batch.set(ref,{...row,addedAt:Date.now()});
+  });
+  batch.commit().then(()=>{
+    _csvData=[];
+    document.getElementById('csvPreview').innerHTML='';
+    document.getElementById('csvImportBtn').style.display='none';
+    renderTeilnehmer(kursId);
+    toast(_csvData.length+' Teilnehmer importiert ✓');
+    toast('Import abgeschlossen ✓');
+  });
+}
+
+// ── Dokumente ──
+function loadKursDocs(){
+  const kursId=document.getElementById('docsKursSelect').value;
+  if(!kursId){ document.getElementById('docsArea').style.display='none'; return; }
+  document.getElementById('docsArea').style.display='block';
+  renderKursDocs(kursId);
+}
+
+function uploadKursDoc(e){
+  const file=e.target.files[0];
+  if(!file) return;
+  e.target.value='';
+  const kursId=document.getElementById('docsKursSelect').value;
+  if(!kursId) return;
+  if(file.size>20*1024*1024){ toast('Datei zu groß (max 20 MB)','bad'); return; }
+  const path='shared/kurse/'+kursId+'/'+Date.now()+'_'+file.name;
+  const prog=document.getElementById('docUploadProgress');
+  prog.innerHTML='<div class="tn-item" style="font-size:.75rem;color:var(--mu)">⬆ Lädt hoch: '+esc(file.name)+'…</div>';
+  const ref=st.ref(path);
+  ref.put(file).on('state_changed',
+    snap=>{ const p=Math.round(snap.bytesTransferred/snap.totalBytes*100); prog.innerHTML='<div class="tn-item" style="font-size:.75rem">⬆ '+p+'% – '+esc(file.name)+'</div>'; },
+    err=>{ prog.innerHTML='<div style="color:var(--bad);font-size:.75rem">❌ '+err.message+'</div>'; },
+    ()=>{ ref.getDownloadURL().then(url=>{
+      db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('docs').add({
+        name:file.name, url, path, size:file.size, type:file.type, ts:Date.now(), uploadedBy:_email
+      }).then(()=>{ prog.innerHTML=''; renderKursDocs(kursId); toast('Dokument hochgeladen ✓'); });
+    }); }
+  );
+}
+
+function renderKursDocs(kursId){
+  const el=document.getElementById('docsList');
+  el.innerHTML='<div class="empty">Lädt…</div>';
+  db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('docs')
+    .orderBy('ts','desc').get()
+    .then(snap=>{
+      if(snap.empty){ el.innerHTML='<div class="empty">Noch keine Dokumente</div>'; return; }
+      el.innerHTML='';
+      snap.forEach(doc=>{
+        const d=doc.data();
+        const icon=d.type&&d.type.startsWith('image')?'🖼':d.type==='application/pdf'?'📄':'📎';
+        const size=d.size>1024*1024?(d.size/1024/1024).toFixed(1)+' MB':Math.round(d.size/1024)+' KB';
+        const item=document.createElement('div');
+        item.className='doc-item';
+        item.innerHTML=`<div class="doc-icon">${icon}</div>
+          <div class="doc-info"><div class="doc-name">${esc(d.name)}</div>
+          <div class="doc-meta">${size} · ${new Date(d.ts).toLocaleDateString('de-DE')} · ${esc(d.uploadedBy||'')}</div></div>
+          <button class="doc-open" onclick="window.open(this.dataset.url,'_blank')" data-url="${esc(d.url)}">Öffnen</button>
+          <button class="doc-del" onclick="deleteKursDoc('${doc.id}','${esc(d.path)}','${kursId}')">🗑</button>`;
+        el.appendChild(item);
+      });
+    });
+}
+
+function deleteKursDoc(docId,path,kursId){
+  if(!confirm('Dokument wirklich löschen?')) return;
+  st.ref(path).delete().catch(()=>{});
+  db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('docs').doc(docId).delete()
+    .then(()=>renderKursDocs(kursId));
+}
+
+// ── Utils ──
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+let _toastTimer;
+function toast(msg,type){
+  const el=document.getElementById('toast');
+  el.textContent=msg;
+  el.style.borderColor=type==='bad'?'var(--bad)':'var(--ok)';
+  el.style.color=type==='bad'?'var(--bad)':'var(--ok)';
+  el.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer=setTimeout(()=>el.classList.remove('show'),2800);
+}
+function closeKursModal(){ document.getElementById('kursModal').classList.remove('open'); }
+</script>
+</body>
+</html>
