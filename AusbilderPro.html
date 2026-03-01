@@ -2275,17 +2275,29 @@ function poolDropBack(e){
 function dropToFehlt(e){
   e.preventDefault();
   document.getElementById('fehltBody').classList.remove('fehlt-dropover');
-  if(!_seatDragId) return;
-  const inst=curInst(); if(!inst) return;
-  const d=inst.seats[_seatDragId]; if(!d||!d.name) return;
-  const tnId   = d.poolTnId;
-  const kursId = d.poolKursId || inst.sharedKursId;
-  ['name','company','profession','ausbjahr','poolTnId','poolKursId'].forEach(k=>delete inst.seats[_seatDragId][k]);
-  if(_db && kursId && tnId)
-    _db.collection('shared').doc('kurse').collection('list').doc(kursId)
-      .collection('teilnehmer').doc(tnId).update({status:'absent'}).catch(()=>{});
-  persist(); renderSeats(); loadPool();
-  _seatDragId=null;
+
+  // Fall 1: Vom Sitzplatz in Fehlt
+  if(_seatDragId){
+    const inst=curInst(); if(!inst) return;
+    const d=inst.seats[_seatDragId]; if(!d||!d.name) return;
+    const tnId   = d.poolTnId;
+    const kursId = d.poolKursId || inst.sharedKursId;
+    ['name','company','profession','ausbjahr','poolTnId','poolKursId'].forEach(k=>delete inst.seats[_seatDragId][k]);
+    if(_db && kursId && tnId)
+      _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+        .collection('teilnehmer').doc(tnId).update({status:'absent'}).catch(()=>{});
+    persist(); renderSeats(); loadPool();
+    _seatDragId=null;
+    return;
+  }
+
+  // Fall 2: Direkt aus Pool in Fehlt
+  if(_poolDragId && _poolDragTnId && _poolDragKursId){
+    _db.collection('shared').doc('kurse').collection('list').doc(_poolDragKursId)
+      .collection('teilnehmer').doc(_poolDragTnId).update({status:'absent'}).catch(()=>{});
+    loadPool();
+    _poolDragId=null; _poolDragTnId=null; _poolDragKursId=null;
+  }
 }
 
 function renderFehlt(kursId){
