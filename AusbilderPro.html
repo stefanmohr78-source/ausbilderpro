@@ -2196,6 +2196,8 @@ function loadPool(){
       body.appendChild(allBtn);
       snap.forEach(doc=>{
         const d=doc.data();
+        // Im Fehlt-Container → nicht im Pool anzeigen
+        if(d.status==='absent') return;
         const fullName = (d.vorname+' '+d.nachname).trim();
         const isPlaced = placed.has(fullName.toLowerCase());
         allTN.push({id:doc.id, name:fullName, company:d.firma||'', profession:d.beruf||'', ausbjahr:d.ausbjahr||''});
