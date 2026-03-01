@@ -227,7 +227,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
                 <div class="fg"><label class="fl">Von</label><input class="fi" type="date" id="newKursVon"></div>
                 <div class="fg"><label class="fl">Bis</label><input class="fi" type="date" id="newKursBis"></div>
               </div>
-              <div class="fg"><label class="fl">Verantwortlicher Ausbilder (optional)</label><input class="fi" id="newKursAusbilder" placeholder="Name des Ausbilders"></div>
+              <div class="fg"><label class="fl">E-Mail des Ausbilders <span style="color:var(--bad)">*</span></label><input class="fi" id="newKursAusbilder" placeholder="ausbilder@hbz.de" type="email"></div>
               <button class="btn-sm btn-ok" onclick="createKurs()" style="width:100%;margin-top:6px">✓ Kurs erstellen</button>
             </div>
           </div>
@@ -460,7 +460,7 @@ function loadDashboard(){
       <div class="kurs-dot"></div>
       <div class="kurs-info">
         <div class="kurs-name">${esc(k.name)}</div>
-        <div class="kurs-meta">${k.von||'?'} – ${k.bis||'?'}${k.ausbilder?' · '+esc(k.ausbilder):''}</div>
+        <div class="kurs-meta">${k.von||'?'} – ${k.bis||'?'}${k.ausbilderEmail?' · '+esc(k.ausbilderEmail):''}</div>
       </div>
       <div class="kurs-cnt">→</div>
     </div>`).join('');
@@ -469,19 +469,21 @@ function loadDashboard(){
 // ── Kurse ──
 function createKurs(){
   const name = document.getElementById('newKursName').value.trim();
+  const ausb = document.getElementById('newKursAusbilder').value.trim();
   if(!name){ toast('Bitte Kursname eingeben','bad'); return; }
+  if(!ausb||!ausb.includes('@')){ toast('Bitte gültige E-Mail des Ausbilders eingeben','bad'); return; }
   const von  = document.getElementById('newKursVon').value;
   const bis  = document.getElementById('newKursBis').value;
-  const ausb = document.getElementById('newKursAusbilder').value.trim();
   db.collection('shared').doc('kurse').collection('list').add({
-    name, von, bis, ausbilder:ausb, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: _uid
+    name, von, bis, ausbilderEmail: ausb.toLowerCase(),
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: _uid
   }).then(()=>{
     document.getElementById('newKursName').value='';
     document.getElementById('newKursVon').value='';
     document.getElementById('newKursBis').value='';
     document.getElementById('newKursAusbilder').value='';
     toast('Kurs erstellt ✓');
-  });
+  }).catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
 function renderKursList(){
@@ -493,7 +495,7 @@ function renderKursList(){
       <div class="kurs-dot"></div>
       <div class="kurs-info">
         <div class="kurs-name">${esc(k.name)}</div>
-        <div class="kurs-meta">${k.von||'?'} – ${k.bis||'?'}${k.ausbilder?' · '+esc(k.ausbilder):''}</div>
+        <div class="kurs-meta">${k.von||'?'} – ${k.bis||'?'}${k.ausbilderEmail?' · '+esc(k.ausbilderEmail):''}</div>
         <div class="kurs-cnt" id="kcnt-${k.id}">…</div>
       </div>
       <button class="kurs-del" onclick="deleteKurs('${k.id}',event)">🗑</button>
