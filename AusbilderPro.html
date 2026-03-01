@@ -151,12 +151,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .pool-sub{font-size:.58rem;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .pool-all-btn{width:100%;margin-bottom:8px;font-size:.68rem;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);border-radius:7px;color:var(--acc);padding:7px;cursor:pointer;font-family:'Sora',sans-serif;font-weight:600;transition:all .12s;}
 .pool-all-btn:hover{background:rgba(59,130,246,.2);}
-.fehlt-hdr{padding:8px 14px;border-top:2px solid rgba(239,68,68,.3);border-bottom:1px solid var(--brd);font-size:.6rem;font-weight:700;color:#ef4444;text-transform:uppercase;letter-spacing:.08em;font-family:'JetBrains Mono',monospace;background:rgba(239,68,68,.05);flex-shrink:0;}
-.fehlt-body{min-height:80px;max-height:200px;overflow-y:auto;padding:6px 8px;background:rgba(239,68,68,.03);flex-shrink:0;}
-.fehlt-body.fehlt-dropover{background:rgba(239,68,68,.1);outline:2px dashed #ef4444;outline-offset:-4px;}
-.fehlt-card{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:8px;padding:7px 10px;margin-bottom:4px;cursor:grab;display:flex;align-items:center;gap:8px;transition:all .12s;}
-.fehlt-card:hover{border-color:#ef4444;}
-.fehlt-card .pool-avatar{background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.3);color:#ef4444;}
 .seat.pool-target{outline:2px dashed var(--acc);outline-offset:2px;}
 @media(max-width:900px){.pool-sidebar{display:none;}}
 .main-docs-btn{font-size:.65rem!important;padding:3px 9px!important;}
@@ -633,14 +627,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     </div>
     <div class="pool-sb-body" id="poolSbBody" ondragover="event.preventDefault();this.classList.add('pool-sb-dropover')" ondragleave="this.classList.remove('pool-sb-dropover')" ondrop="poolDropBack(event)">
       <div class="pool-empty">Kein Kurs verknüpft.<br><span style="color:var(--acc);cursor:pointer" onclick="openPoolLink()">→ Jetzt verknüpfen</span></div>
-    </div>
-    <!-- FEHLT BEREICH -->
-    <div class="fehlt-hdr">✗ Fehlt</div>
-    <div class="fehlt-body" id="fehltBody" 
-      ondragover="event.preventDefault();this.classList.add('fehlt-dropover')" 
-      ondragleave="this.classList.remove('fehlt-dropover')" 
-      ondrop="dropToFehlt(event)">
-      <div class="pool-empty" style="padding:12px">Schüler hierher ziehen</div>
     </div>
   </div>
 </div>
@@ -1360,19 +1346,8 @@ function mkSeat(id,seats){
   el.innerHTML+='<div class="seat-moves-lr"><button class="seat-move-lr" onclick="moveSeatRow(event,\''+id+'\',\'-1\')" title="Reihe links">&#9664;</button><button class="seat-move-lr" onclick="moveSeatRow(event,\''+id+'\',\'1\')" title="Reihe rechts">&#9654;</button></div>';
   // drag & drop
   el.draggable=true;
-  el.addEventListener('dragstart',e=>{ 
-    _dragSeatId=id; 
-    e.dataTransfer.effectAllowed='move'; 
-    el.classList.add('dragging');
-    // Für Pool-Rückgabe: wenn Sitzplatz besetzt ist
-    if(d&&d.name){ _seatDragId=id; }
-  });
-  el.addEventListener('dragend',()=>{ 
-    _dragSeatId=null; 
-    el.classList.remove('dragging'); 
-    document.querySelectorAll('.seat').forEach(s=>s.classList.remove('drag-over'));
-    // _seatDragId wird in poolDropBack gecleart
-  });
+  el.addEventListener('dragstart',e=>{ _dragSeatId=id; e.dataTransfer.effectAllowed='move'; el.classList.add('dragging'); });
+  el.addEventListener('dragend',()=>{ _dragSeatId=null; el.classList.remove('dragging'); document.querySelectorAll('.seat').forEach(s=>s.classList.remove('drag-over')); });
   el.addEventListener('dragover',e=>{ e.preventDefault(); if(_dragSeatId&&_dragSeatId!==id){ document.querySelectorAll('.seat').forEach(s=>s.classList.remove('drag-over')); el.classList.add('drag-over'); } });
   el.addEventListener('dragleave',()=>el.classList.remove('drag-over'));
   el.addEventListener('drop',e=>{ e.preventDefault(); if(!_dragSeatId||_dragSeatId===id)return; swapSeats(_dragSeatId,id); });
@@ -2211,7 +2186,6 @@ function loadPool(){
         body.appendChild(card);
       });
       setupSeatDropTargets();
-      renderFehlt(kursId);
     }).catch(()=>{ body.innerHTML='<div class="pool-empty">Fehler beim Laden</div>'; });
   });
 }
@@ -2238,7 +2212,7 @@ function poolPlaceAll(allTN, kursId){
 
 function setupSeatDropTargets(){
   document.querySelectorAll('.seat').forEach(el=>{
-    el.addEventListener('dragover',e=>{ e.preventDefault(); if(_poolDragId) el.classList.add('pool-target'); });
+    el.addEventListener('dragover',e=>{ e.preventDefault(); el.classList.add('pool-target'); });
     el.addEventListener('dragleave',()=>el.classList.remove('pool-target'));
     el.addEventListener('drop',e=>{
       e.preventDefault(); el.classList.remove('pool-target');
@@ -2267,55 +2241,22 @@ function setupSeatDropTargets(){
 }
 
 function poolDropBack(e){
-  // Pool-Body nimmt keine Drops mehr – nur noch Fehlt-Container
   e.preventDefault();
   document.getElementById('poolSbBody').classList.remove('pool-sb-dropover');
-}
-
-function dropToFehlt(e){
-  e.preventDefault();
-  document.getElementById('fehltBody').classList.remove('fehlt-dropover');
   if(!_seatDragId) return;
   const inst=curInst(); if(!inst) return;
   const d=inst.seats[_seatDragId]; if(!d||!d.name) return;
   const tnId   = d.poolTnId;
   const kursId = d.poolKursId || inst.sharedKursId;
+  // Seat leeren
   ['name','company','profession','ausbjahr','poolTnId','poolKursId'].forEach(k=>delete inst.seats[_seatDragId][k]);
-  if(_db && kursId && tnId)
+  // Firestore direkt per ID aktualisieren
+  if(_db && kursId && tnId){
     _db.collection('shared').doc('kurse').collection('list').doc(kursId)
-      .collection('teilnehmer').doc(tnId).update({status:'absent'}).catch(()=>{});
+       .collection('teilnehmer').doc(tnId).update({status:'absent'}).catch(()=>{});
+  }
   persist(); renderSeats(); loadPool();
   _seatDragId=null;
-}
-
-function renderFehlt(kursId){
-  const body=document.getElementById('fehltBody');
-  if(!body||!_db||!kursId){ if(body) body.innerHTML='<div class="pool-empty" style="padding:12px">Schüler hierher ziehen</div>'; return; }
-  _db.collection('shared').doc('kurse').collection('list').doc(kursId)
-    .collection('teilnehmer').where('status','==','absent').get()
-    .then(snap=>{
-      if(snap.empty){ body.innerHTML='<div class="pool-empty" style="padding:12px">Keine Fehlenden</div>'; return; }
-      body.innerHTML='';
-      snap.forEach(doc=>{
-        const d=doc.data();
-        const fullName=(d.vorname+' '+d.nachname).trim();
-        const initials=fullName.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
-        const card=document.createElement('div');
-        card.className='fehlt-card';
-        card.draggable=true;
-        card.dataset.name=fullName; card.dataset.tnid=doc.id; card.dataset.kursid=kursId;
-        card.dataset.company=d.firma||''; card.dataset.profession=d.beruf||''; card.dataset.ausbjahr=d.ausbjahr||'';
-        card.innerHTML='<div class="pool-avatar" style="background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.3);color:#ef4444">'+initials+'</div>'
-          +'<div style="flex:1;min-width:0"><div class="pool-name">'+esc(fullName)+'</div></div>';
-        card.addEventListener('dragstart',e=>{
-          _poolDragId=fullName; _poolDragTnId=doc.id; _poolDragKursId=kursId;
-          card.classList.add('dragging'); e.dataTransfer.effectAllowed='copy';
-        });
-        card.addEventListener('dragend',()=>card.classList.remove('dragging'));
-        body.appendChild(card);
-      });
-      setupSeatDropTargets();
-    }).catch(()=>{});
 }
 
 function openPoolLink(){
