@@ -2279,9 +2279,15 @@ function setupSeatDropTargets(){
       const card=document.querySelector('.pool-card[data-name="'+CSS.escape(_poolDragId)+'"]')
                  || document.querySelector('.wiederholer-card[data-name="'+CSS.escape(_poolDragId)+'"]');
       inst.seats[id]={ ...existing, name:_poolDragId, company:card?card.dataset.company:'', profession:card?card.dataset.profession:'', ausbjahr:card?card.dataset.ausbjahr:'', poolTnId:_poolDragTnId, poolKursId:_poolDragKursId };
-      if(_db && _poolDragKursId && _poolDragTnId)
-        _db.collection('shared').doc('kurse').collection('list').doc(_poolDragKursId).collection('teilnehmer').doc(_poolDragTnId).update({status:'attending'}).catch(()=>{});
-      persist(); renderSeats(); loadPool();
+      // Status zurücksetzen: attending wenn Firestore-ID, sonst status-Feld löschen
+      if(_db && _poolDragKursId && _poolDragTnId){
+        _db.collection('shared').doc('kurse').collection('list').doc(_poolDragKursId)
+          .collection('teilnehmer').doc(_poolDragTnId)
+          .update({status:'attending'}).then(()=>loadPool()).catch(()=>loadPool());
+      } else {
+        loadPool();
+      }
+      persist(); renderSeats();
       _poolDragId=null; _poolDragTnId=null; _poolDragKursId=null;
     });
     el.setAttribute('draggable','true');
