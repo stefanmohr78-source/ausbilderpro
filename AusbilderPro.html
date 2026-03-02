@@ -2307,10 +2307,12 @@ function dropToFehlt(e){
     const tnId   = d.poolTnId;
     const kursId = d.poolKursId || inst.sharedKursId;
     ['name','company','profession','ausbjahr','poolTnId','poolKursId'].forEach(k=>delete inst.seats[_seatDragId][k]);
-    if(_db && kursId && tnId)
+    persist(); renderSeats();
+    if(_db && kursId && tnId){
       _db.collection('shared').doc('kurse').collection('list').doc(kursId)
-        .collection('teilnehmer').doc(tnId).update({status:'absent'}).catch(()=>{});
-    persist(); renderSeats(); loadPool();
+        .collection('teilnehmer').doc(tnId).update({status:'absent'})
+        .then(()=>loadPool()).catch(()=>loadPool());
+    } else { loadPool(); }
     _seatDragId=null;
     return;
   }
@@ -2318,8 +2320,8 @@ function dropToFehlt(e){
   // Fall 2: Direkt aus Pool in Fehlt
   if(_poolDragId && _poolDragTnId && _poolDragKursId){
     _db.collection('shared').doc('kurse').collection('list').doc(_poolDragKursId)
-      .collection('teilnehmer').doc(_poolDragTnId).update({status:'absent'}).catch(()=>{});
-    loadPool();
+      .collection('teilnehmer').doc(_poolDragTnId).update({status:'absent'})
+      .then(()=>loadPool()).catch(()=>loadPool());
     _poolDragId=null; _poolDragTnId=null; _poolDragKursId=null;
   }
 }
@@ -2332,14 +2334,17 @@ function dropToWiederholer(e){
   if(_seatDragId){
     const inst=curInst(); if(!inst) return;
     const d=inst.seats[_seatDragId]; if(!d||!d.name) return;
-    const tnId = d.poolTnId;
+    const tnId   = d.poolTnId;
     const kursId = d.poolKursId || inst.sharedKursId;
-    // Als Wiederholer markieren – NICHT vom Sitzplatz entfernen, nur Klasse setzen
     inst.seats[_seatDragId].wiederholer = true;
-    if(_db && kursId && tnId)
+    persist(); renderSeats();
+    if(_db && kursId && tnId){
       _db.collection('shared').doc('kurse').collection('list').doc(kursId)
-        .collection('teilnehmer').doc(tnId).update({status:'wiederholer'}).catch(()=>{});
-    persist(); renderSeats(); loadPool();
+        .collection('teilnehmer').doc(tnId).update({status:'wiederholer'})
+        .then(()=>loadPool()).catch(()=>loadPool());
+    } else {
+      loadPool();
+    }
     _seatDragId=null;
     return;
   }
@@ -2347,8 +2352,8 @@ function dropToWiederholer(e){
   // Aus Pool direkt in Wiederholer
   if(_poolDragId && _poolDragTnId && _poolDragKursId){
     _db.collection('shared').doc('kurse').collection('list').doc(_poolDragKursId)
-      .collection('teilnehmer').doc(_poolDragTnId).update({status:'wiederholer'}).catch(()=>{});
-    loadPool();
+      .collection('teilnehmer').doc(_poolDragTnId).update({status:'wiederholer'})
+      .then(()=>loadPool()).catch(()=>loadPool());
     _poolDragId=null; _poolDragTnId=null; _poolDragKursId=null;
   }
 }
