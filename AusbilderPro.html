@@ -151,7 +151,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .pool-all-btn{width:100%;margin-bottom:8px;font-size:.68rem;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);border-radius:7px;color:#2563eb;padding:7px;cursor:pointer;font-family:'Sora',sans-serif;font-weight:600;transition:all .12s;}
 .pool-all-btn:hover{background:rgba(59,130,246,.2);}
 .fehlt-hdr{padding:8px 14px;border-top:2px solid rgba(239,68,68,.3);border-bottom:1px solid var(--brd);font-size:.6rem;font-weight:700;color:#ef4444;text-transform:uppercase;letter-spacing:.08em;font-family:'JetBrains Mono',monospace;background:rgba(239,68,68,.05);flex-shrink:0;}
-.fehlt-body{min-height:80px;max-height:200px;overflow-y:auto;padding:6px 8px;background:#f0f2f8;flex-shrink:0;}
+.fehlt-body{min-height:60px;max-height:160px;overflow-y:auto;padding:6px 8px;background:#f0f2f8;flex-shrink:0;}
 .fehlt-body.fehlt-dropover{background:rgba(239,68,68,.1);outline:2px dashed #ef4444;outline-offset:-4px;}
 .fehlt-card{background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.25);border-radius:8px;padding:7px 10px;margin-bottom:4px;cursor:grab;display:flex;align-items:center;gap:8px;transition:all .12s;}
 .fehlt-card:hover{border-color:#ef4444;}
@@ -399,7 +399,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .bdgr{background:linear-gradient(135deg,#dc2626,#ef4444);box-shadow:0 4px 14px rgba(239,68,68,.16);margin-top:5px;}
 .bdgr:hover{box-shadow:0 6px 22px rgba(239,68,68,.25);}
 .ni{resize:vertical;min-height:50px;}
-.copyright{position:fixed;bottom:8px;right:12px;z-index:97;font-family:'JetBrains Mono',monospace;font-size:.52rem;color:var(--mu);opacity:.45;pointer-events:none;user-select:none;letter-spacing:.04em;}
+.copyright{position:fixed;bottom:8px;right:12px;z-index:97;font-family:'JetBrains Mono',monospace;font-size:.52rem;color:var(--mu);opacity:.45;pointer-events:none;user-select:none;letter-spacing:.04em;border-top:1px solid rgba(100,116,139,.2);padding-top:5px;}
 /* PASSWORD SCREEN */
 .pw-screen{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;}
 .pw-box{background:var(--sur);border:2px solid #3a4060;border-radius:16px;padding:36px 32px;width:100%;max-width:340px;box-shadow:0 24px 80px rgba(0,0,0,.7);display:flex;flex-direction:column;align-items:center;gap:18px;}
@@ -592,7 +592,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" onclick="gdriveAction()"><span class="mni">☁</span>☁ Drive</button>
 </div>
 <input type="file" id="impFileMob" accept=".json,.hbz" style="display:none" onchange="doImport(event)">
-<div class="copyright">© AusbilderPro · Entwickler Stefan Mohr</div>
+<div class="copyright">© AusbilderPro ─ Entwickler Stefan Mohr</div>
 
 <!-- GOOGLE DRIVE MODAL -->
 <div class="dpov" id="driveModal" onclick="if(event.target===this)closeDriveModal()">
@@ -2337,13 +2337,14 @@ function dropToWiederholer(e){
     const tnId   = d.poolTnId;
     const kursId = d.poolKursId || inst.sharedKursId;
     inst.seats[_seatDragId].wiederholer = true;
-    persist(); renderSeats();
+  persist(); renderSeats();
     if(_db && kursId && tnId){
       _db.collection('shared').doc('kurse').collection('list').doc(kursId)
         .collection('teilnehmer').doc(tnId).update({status:'wiederholer'})
         .then(()=>loadPool()).catch(()=>loadPool());
     } else {
       loadPool();
+      renderWiederholer(null);
     }
     _seatDragId=null;
     return;
@@ -2360,15 +2361,45 @@ function dropToWiederholer(e){
 
 function renderWiederholer(kursId){
   const body=document.getElementById('wiederholerBody');
-  if(!body||!_db||!kursId){ if(body) body.innerHTML='<div class="pool-empty" style="padding:12px">Schüler hierher ziehen</div>'; return; }
+  if(!body) return;
+
+  // Lokale Wiederholer aus Sitzplatzdaten sammeln (funktioniert auch ohne Kursverknüpfung)
+  const inst=curInst();
+  const localWiederholer=[];
+  if(inst){
+    Object.entries(inst.seats).forEach(([sid,d])=>{
+      if(d && d.name && d.wiederholer) localWiederholer.push({sid, d});
+    });
+  }
+
+  // Wenn kein Kurs verknüpft → nur lokale anzeigen
+  if(!_db||!kursId){
+    if(!localWiederholer.length){ body.innerHTML='<div class="pool-empty" style="padding:12px">Keine Wiederholer</div>'; return; }
+    body.innerHTML='';
+    localWiederholer.forEach(({sid,d})=>{
+      const initials=d.name.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
+      const card=document.createElement('div');
+      card.className='wiederholer-card';
+      card.innerHTML='<div class="pool-avatar" style="background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.3);color:#d97706">'+initials+'</div>'
+        +'<div style="flex:1;min-width:0"><div class="pool-name" style="color:#1e2433">'+esc(d.name)+'</div>'
+        +'<div class="pool-sub">↩ Wiederholer</div></div>';
+      body.appendChild(card);
+    });
+    return;
+  }
+
+  // Mit Kurs: Firestore-Abfrage + lokale zusammenführen
   _db.collection('shared').doc('kurse').collection('list').doc(kursId)
     .collection('teilnehmer').where('status','==','wiederholer').get()
     .then(snap=>{
-      if(snap.empty){ body.innerHTML='<div class="pool-empty" style="padding:12px">Keine Wiederholer</div>'; return; }
       body.innerHTML='';
+      const shown=new Set();
+
+      // Firestore-Wiederholer
       snap.forEach(doc=>{
         const d=doc.data();
         const fullName=(d.vorname+' '+d.nachname).trim();
+        shown.add(fullName.toLowerCase());
         const initials=fullName.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
         const card=document.createElement('div');
         card.className='wiederholer-card';
@@ -2378,14 +2409,27 @@ function renderWiederholer(kursId){
         card.innerHTML='<div class="pool-avatar" style="background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.3);color:#d97706">'+initials+'</div>'
           +'<div style="flex:1;min-width:0"><div class="pool-name" style="color:#1e2433">'+esc(fullName)+'</div>'
           +'<div class="pool-sub">↩ Wiederholer</div></div>';
-        // Drag zurück auf Sitzplatz
-        card.addEventListener('dragstart',e=>{
+        card.addEventListener('dragstart',ev=>{
           _poolDragId=fullName; _poolDragTnId=doc.id; _poolDragKursId=kursId;
-          card.classList.add('dragging'); e.dataTransfer.effectAllowed='copy';
+          card.classList.add('dragging'); ev.dataTransfer.effectAllowed='copy';
         });
         card.addEventListener('dragend',()=>card.classList.remove('dragging'));
         body.appendChild(card);
       });
+
+      // Lokale die nicht in Firestore sind (kein poolTnId)
+      localWiederholer.forEach(({d})=>{
+        if(shown.has(d.name.toLowerCase())) return;
+        const initials=d.name.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
+        const card=document.createElement('div');
+        card.className='wiederholer-card';
+        card.innerHTML='<div class="pool-avatar" style="background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.3);color:#d97706">'+initials+'</div>'
+          +'<div style="flex:1;min-width:0"><div class="pool-name" style="color:#1e2433">'+esc(d.name)+'</div>'
+          +'<div class="pool-sub">↩ Wiederholer</div></div>';
+        body.appendChild(card);
+      });
+
+      if(!body.children.length) body.innerHTML='<div class="pool-empty" style="padding:12px">Keine Wiederholer</div>';
       setupSeatDropTargets();
     }).catch(()=>{});
 }
