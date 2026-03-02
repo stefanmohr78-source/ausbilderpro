@@ -2165,6 +2165,7 @@ function _pwHash(s){
 // ═══════════════════════════════════════════════
 let _poolDragId = null;
 let _wiederholerSeatId = null; // tracks local wiederholer card origin seat
+let _fehltLocal = false; // tracks if dragged card is a local fehlt entry
 let _poolDragTnId = null;
 let _poolDragKursId = null;
 let _seatDragId = null;
@@ -2276,6 +2277,11 @@ function setupSeatDropTargets(){
         if(inst.seats[_wiederholerSeatId]) delete inst.seats[_wiederholerSeatId].wiederholer;
         _wiederholerSeatId=null;
       }
+      // Lokalen Fehlt-Eintrag entfernen
+      if(_fehltLocal && inst.fehltStudents){
+        inst.fehltStudents = inst.fehltStudents.filter(f=>f.name!==_poolDragId);
+        _fehltLocal=false;
+      }
       const card=document.querySelector('.pool-card[data-name="'+CSS.escape(_poolDragId)+'"]')
                  || document.querySelector('.wiederholer-card[data-name="'+CSS.escape(_poolDragId)+'"]');
       const newSeatData = { ...existing, name:_poolDragId, company:card?card.dataset.company:'', profession:card?card.dataset.profession:'', ausbjahr:card?card.dataset.ausbjahr:'', poolTnId:_poolDragTnId, poolKursId:_poolDragKursId };
@@ -2301,7 +2307,7 @@ function setupSeatDropTargets(){
       _seatDragId=id;
       e.dataTransfer.effectAllowed='move';
     });
-    el.addEventListener('dragend',()=>{ _seatDragId=null; _poolDragId=null; _wiederholerSeatId=null; });
+    el.addEventListener('dragend',()=>{ _seatDragId=null; _poolDragId=null; _wiederholerSeatId=null; _fehltLocal=false; });
   });
 }
 
@@ -2321,8 +2327,17 @@ function dropToFehlt(e){
     const d=inst.seats[_seatDragId]; if(!d||!d.name) return;
     const tnId   = d.poolTnId;
     const kursId = d.poolKursId || inst.sharedKursId;
-    ['name','company','profession','ausbjahr','poolTnId','poolKursId'].forEach(k=>delete inst.seats[_seatDragId][k]);
+
+    // Lokale Sicherung: fehltStudents am Inst-Objekt
+    if(!inst.fehltStudents) inst.fehltStudents=[];
+    // Verhindere Duplikate
+    if(!inst.fehltStudents.find(f=>f.name===d.name)){
+      inst.fehltStudents.push({name:d.name, company:d.company||'', profession:d.profession||'', ausbjahr:d.ausbjahr||'', poolTnId:tnId||null, poolKursId:kursId||null});
+    }
+
+    ['name','company','profession','ausbjahr','poolTnId','poolKursId','wiederholer'].forEach(k=>delete inst.seats[_seatDragId][k]);
     persist(); renderSeats();
+
     if(_db && kursId && tnId){
       _db.collection('shared').doc('kurse').collection('list').doc(kursId)
         .collection('teilnehmer').doc(tnId).update({status:'absent'})
@@ -2460,30 +2475,56 @@ function renderWiederholer(kursId){
 
 function renderFehlt(kursId){
   const body=document.getElementById('fehltBody');
-  if(!body||!_db||!kursId){ if(body) body.innerHTML='<div class="pool-empty" style="padding:12px">Schüler hierher ziehen</div>'; return; }
+  if(!body) return;
+
+  const inst=curInst();
+  const localFehlt = (inst && inst.fehltStudents) ? inst.fehltStudents : [];
+
+  function makeCard(name, company, tnId, fsKursId, profession, ausbjahr){
+    const initials=name.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
+    const card=document.createElement('div');
+    card.className='fehlt-card';
+    card.draggable=true;
+    card.dataset.name=name; card.dataset.tnid=tnId||''; card.dataset.kursid=fsKursId||'';
+    card.dataset.company=company||''; card.dataset.profession=profession||''; card.dataset.ausbjahr=ausbjahr||'';
+    card.innerHTML='<div class="pool-avatar" style="background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.3);color:#ef4444">'+initials+'</div>'
+      +'<div style="flex:1;min-width:0"><div class="pool-name">'+esc(name)+'</div></div>';
+    card.addEventListener('dragstart',ev=>{
+      _poolDragId=name; _poolDragTnId=tnId||null; _poolDragKursId=fsKursId||null;
+      _fehltLocal = !tnId; // flag: ist lokaler Fehlt-Eintrag
+      card.classList.add('dragging'); ev.dataTransfer.effectAllowed='copy';
+    });
+    card.addEventListener('dragend',()=>card.classList.remove('dragging'));
+    return card;
+  }
+
+  // Kein Firestore → nur lokale anzeigen
+  if(!_db||!kursId){
+    if(!localFehlt.length){ body.innerHTML='<div class="pool-empty" style="padding:12px">Schüler hierher ziehen</div>'; return; }
+    body.innerHTML='';
+    localFehlt.forEach(f=>body.appendChild(makeCard(f.name, f.company, f.poolTnId, f.poolKursId, f.profession, f.ausbjahr)));
+    setupSeatDropTargets();
+    return;
+  }
+
+  // Mit Firestore: beide Quellen zusammenführen
   _db.collection('shared').doc('kurse').collection('list').doc(kursId)
     .collection('teilnehmer').where('status','==','absent').get()
     .then(snap=>{
-      if(snap.empty){ body.innerHTML='<div class="pool-empty" style="padding:12px">Keine Fehlenden</div>'; return; }
       body.innerHTML='';
+      const shown=new Set();
       snap.forEach(doc=>{
         const d=doc.data();
         const fullName=(d.vorname+' '+d.nachname).trim();
-        const initials=fullName.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
-        const card=document.createElement('div');
-        card.className='fehlt-card';
-        card.draggable=true;
-        card.dataset.name=fullName; card.dataset.tnid=doc.id; card.dataset.kursid=kursId;
-        card.dataset.company=d.firma||''; card.dataset.profession=d.beruf||''; card.dataset.ausbjahr=d.ausbjahr||'';
-        card.innerHTML='<div class="pool-avatar" style="background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.3);color:#ef4444">'+initials+'</div>'
-          +'<div style="flex:1;min-width:0"><div class="pool-name">'+esc(fullName)+'</div></div>';
-        card.addEventListener('dragstart',e=>{
-          _poolDragId=fullName; _poolDragTnId=doc.id; _poolDragKursId=kursId;
-          card.classList.add('dragging'); e.dataTransfer.effectAllowed='copy';
-        });
-        card.addEventListener('dragend',()=>card.classList.remove('dragging'));
-        body.appendChild(card);
+        shown.add(fullName.toLowerCase());
+        body.appendChild(makeCard(fullName, d.firma||'', doc.id, kursId, d.beruf||'', d.ausbjahr||''));
       });
+      // Lokale die nicht in Firestore sind
+      localFehlt.forEach(f=>{
+        if(!shown.has(f.name.toLowerCase()))
+          body.appendChild(makeCard(f.name, f.company, f.poolTnId, f.poolKursId, f.profession, f.ausbjahr));
+      });
+      if(!body.children.length) body.innerHTML='<div class="pool-empty" style="padding:12px">Schüler hierher ziehen</div>';
       setupSeatDropTargets();
     }).catch(()=>{});
 }
