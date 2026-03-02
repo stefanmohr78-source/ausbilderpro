@@ -2278,7 +2278,9 @@ function setupSeatDropTargets(){
       }
       const card=document.querySelector('.pool-card[data-name="'+CSS.escape(_poolDragId)+'"]')
                  || document.querySelector('.wiederholer-card[data-name="'+CSS.escape(_poolDragId)+'"]');
-      inst.seats[id]={ ...existing, name:_poolDragId, company:card?card.dataset.company:'', profession:card?card.dataset.profession:'', ausbjahr:card?card.dataset.ausbjahr:'', poolTnId:_poolDragTnId, poolKursId:_poolDragKursId };
+      const newSeatData = { ...existing, name:_poolDragId, company:card?card.dataset.company:'', profession:card?card.dataset.profession:'', ausbjahr:card?card.dataset.ausbjahr:'', poolTnId:_poolDragTnId, poolKursId:_poolDragKursId };
+      delete newSeatData.wiederholer; // immer entfernen, egal ob Wiederholer-Karte oder Pool-Karte
+      inst.seats[id] = newSeatData;
       // Status zurücksetzen: attending wenn Firestore-ID, sonst status-Feld löschen
       if(_db && _poolDragKursId && _poolDragTnId){
         _db.collection('shared').doc('kurse').collection('list').doc(_poolDragKursId)
