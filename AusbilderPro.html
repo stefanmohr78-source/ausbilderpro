@@ -638,7 +638,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div class="pool-empty">Kein Kurs verknüpft.<br><span style="color:var(--acc);cursor:pointer" onclick="openPoolLink()">→ Jetzt verknüpfen</span></div>
     </div>
     <!-- FEHLT BEREICH -->
-    <div class="fehlt-hdr">✗ Fehlt</div>
+    <div class="fehlt-hdr">✗ Nicht erschienen</div>
     <div class="fehlt-body" id="fehltBody" 
       ondragover="event.preventDefault();this.classList.add('fehlt-dropover')" 
       ondragleave="this.classList.remove('fehlt-dropover')" 
@@ -646,7 +646,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div class="pool-empty" style="padding:12px">Schüler hierher ziehen</div>
     </div>
     <!-- WIEDERHOLER BEREICH -->
-    <div class="fehlt-hdr" style="border-top-color:rgba(245,158,11,.4);color:#d97706;background:rgba(245,158,11,.05)">↩ Wiederholer</div>
+    <div class="fehlt-hdr" style="border-top-color:rgba(245,158,11,.4);color:#d97706;background:rgba(245,158,11,.05)">↩ Kurs wiederholen</div>
     <div class="fehlt-body" id="wiederholerBody" style="background:#f0f2f8"
       ondragover="event.preventDefault();this.classList.add('wiederholer-dropover')" 
       ondragleave="this.classList.remove('wiederholer-dropover')" 
@@ -2279,11 +2279,11 @@ function setupSeatDropTargets(){
         if(inst.seats[_wiederholerSeatId]) delete inst.seats[_wiederholerSeatId].wiederholer;
         _wiederholerSeatId=null;
       }
-      // Lokalen Fehlt-Eintrag entfernen
-      if(_fehltLocal && inst.fehltStudents){
+      // Lokalen Fehlt-Eintrag immer entfernen (egal ob Firestore oder lokal)
+      if(inst.fehltStudents){
         inst.fehltStudents = inst.fehltStudents.filter(f=>f.name!==_poolDragId);
-        _fehltLocal=false;
       }
+      _fehltLocal=false;
       const card=document.querySelector('.pool-card[data-name="'+CSS.escape(_poolDragId)+'"]')
                  || document.querySelector('.wiederholer-card[data-name="'+CSS.escape(_poolDragId)+'"]');
       const newSeatData = { ...existing, name:_poolDragId, company:card?card.dataset.company:'', profession:card?card.dataset.profession:'', ausbjahr:card?card.dataset.ausbjahr:'', poolTnId:_poolDragTnId, poolKursId:_poolDragKursId };
@@ -2406,7 +2406,7 @@ function renderWiederholer(kursId){
 
   // Wenn kein Kurs verknüpft → nur lokale anzeigen
   if(!_db||!kursId){
-    if(!localWiederholer.length){ body.innerHTML='<div class="pool-empty" style="padding:12px">Keine Wiederholer</div>'; return; }
+    if(!localWiederholer.length){ body.innerHTML='<div class="pool-empty" style="padding:12px">Keine Kurs-Wiederholer</div>'; return; }
     body.innerHTML='';
     localWiederholer.forEach(({sid,d})=>{
       const initials=d.name.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
@@ -2416,7 +2416,7 @@ function renderWiederholer(kursId){
       card.dataset.name=d.name; card.dataset.company=d.company||''; card.dataset.profession=d.profession||''; card.dataset.ausbjahr=d.ausbjahr||'';
       card.innerHTML='<div class="pool-avatar" style="background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.3);color:#d97706">'+initials+'</div>'
         +'<div style="flex:1;min-width:0"><div class="pool-name" style="color:#1e2433">'+esc(d.name)+'</div>'
-        +'<div class="pool-sub">↩ Wiederholer</div></div>';
+        +'<div class="pool-sub">↩ Kurs wiederholen</div></div>';
       card.addEventListener('dragstart',ev=>{
         _poolDragId=d.name; _poolDragTnId=null; _poolDragKursId=null;
         _wiederholerSeatId=sid;
@@ -2449,7 +2449,7 @@ function renderWiederholer(kursId){
         card.dataset.company=d.firma||''; card.dataset.profession=d.beruf||''; card.dataset.ausbjahr=d.ausbjahr||'';
         card.innerHTML='<div class="pool-avatar" style="background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.3);color:#d97706">'+initials+'</div>'
           +'<div style="flex:1;min-width:0"><div class="pool-name" style="color:#1e2433">'+esc(fullName)+'</div>'
-          +'<div class="pool-sub">↩ Wiederholer</div></div>';
+          +'<div class="pool-sub">↩ Kurs wiederholen</div></div>';
         card.addEventListener('dragstart',ev=>{
           _poolDragId=fullName; _poolDragTnId=doc.id; _poolDragKursId=kursId;
           card.classList.add('dragging'); ev.dataTransfer.effectAllowed='copy';
@@ -2466,11 +2466,11 @@ function renderWiederholer(kursId){
         card.className='wiederholer-card';
         card.innerHTML='<div class="pool-avatar" style="background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.3);color:#d97706">'+initials+'</div>'
           +'<div style="flex:1;min-width:0"><div class="pool-name" style="color:#1e2433">'+esc(d.name)+'</div>'
-          +'<div class="pool-sub">↩ Wiederholer</div></div>';
+          +'<div class="pool-sub">↩ Kurs wiederholen</div></div>';
         body.appendChild(card);
       });
 
-      if(!body.children.length) body.innerHTML='<div class="pool-empty" style="padding:12px">Keine Wiederholer</div>';
+      if(!body.children.length) body.innerHTML='<div class="pool-empty" style="padding:12px">Keine Kurs-Wiederholer</div>';
       setupSeatDropTargets();
     }).catch(()=>{});
 }

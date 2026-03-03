@@ -636,7 +636,7 @@ function renderTeilnehmer(kursId){
             d.status==='absent'      ? 'background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.3)' :
             d.status==='wiederholer' ? 'background:rgba(245,158,11,.12);color:#d97706;border:1px solid rgba(245,158,11,.3)' :
                                        'background:rgba(100,116,139,.1);color:var(--mu);border:1px solid var(--brd)'
-          }">${d.status==='attending'?'✓ Anwesend':d.status==='absent'?'✗ Fehlt':d.status==='wiederholer'?'↩ Muss wiederholen':'○ Offen'}</div>
+          }">${d.status==='attending'?'✓ Anwesend':d.status==='absent'?'✗ Nicht erschienen':d.status==='wiederholer'?'↩ Kurs wiederholen':'○ Offen'}</div>
           <button class="tn-del" onclick="deleteTN('${doc.id}','${kursId}')">🗑</button>`;
         el.appendChild(item);
       });
