@@ -907,6 +907,8 @@ function persist(){
   localStorage.setItem('ap_v1', JSON.stringify(S));
   _changeCount++;
   showSaveInd();
+  // Cloud-Sync (hook wird von Firebase-Block gesetzt)
+  if(typeof window._fbSaveHook === 'function') window._fbSaveHook();
   // auto file-export after 20 changes
   if(_changeCount - _lastExportCount >= 20){
     clearTimeout(_autoExportTimer);
@@ -2877,8 +2879,8 @@ function fbLoadData(){
     });
 }
 
-// Override persist to also cloud-save
-const _origPersist=persist;
+// Hook für persist() → Cloud-Sync
+window._fbSaveHook = fbSave;
 } catch(e) {
   // Firebase nicht verfügbar – offline-Modus
   console.warn('Firebase nicht verfügbar:', e.message);
