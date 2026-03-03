@@ -2339,17 +2339,12 @@ function dropToFehlt(e){
     const d=inst.seats[_seatDragId]; if(!d||!d.name) return;
     const tnId   = d.poolTnId;
     const kursId = d.poolKursId || inst.sharedKursId;
-
-    // Lokale Sicherung: fehltStudents am Inst-Objekt
     if(!inst.fehltStudents) inst.fehltStudents=[];
-    // Verhindere Duplikate
     if(!inst.fehltStudents.find(f=>f.name===d.name)){
       inst.fehltStudents.push({name:d.name, company:d.company||'', profession:d.profession||'', ausbjahr:d.ausbjahr||'', poolTnId:tnId||null, poolKursId:kursId||null});
     }
-
     ['name','company','profession','ausbjahr','poolTnId','poolKursId','wiederholer'].forEach(k=>delete inst.seats[_seatDragId][k]);
     persist(); renderSeats();
-
     if(_db && kursId && tnId){
       _db.collection('shared').doc('kurse').collection('list').doc(kursId)
         .collection('teilnehmer').doc(tnId).update({status:'absent'})
@@ -2359,8 +2354,32 @@ function dropToFehlt(e){
     return;
   }
 
-  // Fall 2: Direkt aus Pool in Fehlt
-  if(_poolDragId && _poolDragTnId && _poolDragKursId){
+  if(!_poolDragId) return;
+
+  // Fall 2: Aus Wiederholer-Container in Fehlt
+  if(_wiederholerSeatId){
+    const inst=curInst();
+    if(inst && inst.seats[_wiederholerSeatId]){
+      const d=inst.seats[_wiederholerSeatId];
+      // Wiederholer-Flag entfernen, als Fehlt sichern
+      delete inst.seats[_wiederholerSeatId].wiederholer;
+      if(!inst.fehltStudents) inst.fehltStudents=[];
+      if(!inst.fehltStudents.find(f=>f.name===_poolDragId))
+        inst.fehltStudents.push({name:_poolDragId, company:d.company||'', profession:d.profession||'', ausbjahr:d.ausbjahr||'', poolTnId:_poolDragTnId||null, poolKursId:_poolDragKursId||null});
+      ['name','company','profession','ausbjahr','poolTnId','poolKursId'].forEach(k=>delete inst.seats[_wiederholerSeatId][k]);
+      persist(); renderSeats();
+    }
+    if(_db && _poolDragKursId && _poolDragTnId)
+      _db.collection('shared').doc('kurse').collection('list').doc(_poolDragKursId)
+        .collection('teilnehmer').doc(_poolDragTnId).update({status:'absent'})
+        .then(()=>loadPool()).catch(()=>loadPool());
+    else loadPool();
+    _poolDragId=null; _wiederholerSeatId=null;
+    return;
+  }
+
+  // Fall 3: Aus Pool (mit Firestore-ID) in Fehlt
+  if(_poolDragTnId && _poolDragKursId){
     _db.collection('shared').doc('kurse').collection('list').doc(_poolDragKursId)
       .collection('teilnehmer').doc(_poolDragTnId).update({status:'absent'})
       .then(()=>loadPool()).catch(()=>loadPool());
@@ -2392,11 +2411,26 @@ function dropToWiederholer(e){
     return;
   }
 
-  // Aus Pool direkt in Wiederholer
-  if(_poolDragId && _poolDragTnId && _poolDragKursId){
-    _db.collection('shared').doc('kurse').collection('list').doc(_poolDragKursId)
-      .collection('teilnehmer').doc(_poolDragTnId).update({status:'wiederholer'})
-      .then(()=>loadPool()).catch(()=>loadPool());
+  // Aus Pool direkt in Wiederholer (inkl. Fehlt→Wiederholer)
+  if(_poolDragId){
+    // Fehlt-Eintrag entfernen falls vorhanden
+    const inst2=curInst();
+    if(inst2 && inst2.fehltStudents)
+      inst2.fehltStudents = inst2.fehltStudents.filter(f=>f.name!==_poolDragId);
+
+    // Wiederholer-Flag auf zugehörigem Sitz setzen (suche Sitz mit diesem Namen)
+    if(inst2){
+      Object.entries(inst2.seats).forEach(([sid,d])=>{
+        if(d && d.name===_poolDragId){ inst2.seats[sid].wiederholer=true; }
+      });
+      persist(); renderSeats();
+    }
+
+    if(_db && _poolDragKursId && _poolDragTnId){
+      _db.collection('shared').doc('kurse').collection('list').doc(_poolDragKursId)
+        .collection('teilnehmer').doc(_poolDragTnId).update({status:'wiederholer'})
+        .then(()=>loadPool()).catch(()=>loadPool());
+    } else { loadPool(); }
     _poolDragId=null; _poolDragTnId=null; _poolDragKursId=null;
   }
 }
