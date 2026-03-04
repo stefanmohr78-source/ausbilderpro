@@ -1872,8 +1872,8 @@ function loadGlobalTN(){
     updateKursTNCounts();
     renderSbTnTree();
     if(_tnBerufFilter) filterGlobalTN();
-    // Dashboard aktuell halten
-    if(document.getElementById('page-dashboard')?.classList.contains('active')) loadDashboard();
+    // Dashboard immer aktualisieren (auch im Hintergrund)
+    loadDashboard();
   });
 }
 
@@ -2063,9 +2063,28 @@ function updateGlobalTN(tnId){
 }
 
 function deleteGlobalTN(tnId){
-  if(!confirm('Wirklich löschen?')) return;
-  db.collection('globalTN').doc(tnId).delete()
-    .then(()=>{toast('Gelöscht');closeTNModal();})
+  const t = _globalTN.find(x=>x.id===tnId);
+  const name = t ? (t.vorname+' '+t.nachname).trim() : 'Teilnehmer';
+  if(!confirm(name+' wirklich löschen?')) return;
+
+  const kursId = t ? t.aktiverKursId : null;
+  const promises = [db.collection('globalTN').doc(tnId).delete()];
+
+  // Auch aus Kurs-Subcollection entfernen falls zugeordnet
+  if(kursId){
+    promises.push(
+      db.collection('shared').doc('kurse').collection('list').doc(kursId)
+        .collection('teilnehmer').doc(tnId).delete().catch(()=>{})
+    );
+  }
+
+  Promise.all(promises)
+    .then(()=>{
+      toast(name+' gelöscht');
+      closeTNModal();
+      // Dashboard sofort aktualisieren
+      loadDashboard();
+    })
     .catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
