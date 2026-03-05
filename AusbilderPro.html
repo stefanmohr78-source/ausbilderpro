@@ -161,6 +161,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .pool-card:hover{border-color:var(--acc);background:rgba(59,130,246,.05);}
 .pool-card.dragging{opacity:.4;border-color:var(--acc);}
 .pool-card.placed{opacity:.45;border-color:var(--ok);border-style:dashed;cursor:default;}
+.pool-sb-body.hide-placed .pool-card.placed{display:none;}
+.pool-hide-btn{font-size:.58rem;padding:3px 8px;border-radius:5px;border:1px solid #c8d0e8;background:#fff;color:#475569;cursor:pointer;font-family:'JetBrains Mono',monospace;transition:all .12s;}
+.pool-hide-btn:hover{background:#e8ebf2;}
+.pool-hide-btn.active{background:#2563eb;color:#fff;border-color:#2563eb;}
 .pool-avatar{width:28px;height:28px;border-radius:50%;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25);display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:var(--acc);flex-shrink:0;}
 .pool-name{font-size:.73rem;font-weight:700;color:#1e2230;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .pool-sub{font-size:.58rem;color:#8896b0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -677,10 +681,13 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <!-- RECHTER POOL SIDEBAR -->
   <div class="pool-sidebar" id="poolSidebar">
     <div class="pool-sb-hdr" id="poolSbHdr">
-      <div class="pool-sb-title">👥 Teilnehmerpool</div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div class="pool-sb-title">👥 Teilnehmerpool</div>
+        <button class="pool-hide-btn active" id="poolHideBtn" onclick="toggleHidePlaced()" title="Platzierte ein-/ausblenden">👁 Offen</button>
+      </div>
       <button class="pool-link-btn" onclick="openPoolLink()">🔗 Kurs verknüpfen</button>
     </div>
-    <div class="pool-sb-body" id="poolSbBody" ondragover="event.preventDefault();this.classList.add('pool-sb-dropover')" ondragleave="this.classList.remove('pool-sb-dropover')" ondrop="poolDropBack(event)">
+    <div class="pool-sb-body hide-placed" id="poolSbBody" ondragover="event.preventDefault();this.classList.add('pool-sb-dropover')" ondragleave="this.classList.remove('pool-sb-dropover')" ondrop="poolDropBack(event)">
       <div class="pool-empty">Kein Kurs verknüpft.<br><span style="color:var(--acc);cursor:pointer" onclick="openPoolLink()">→ Jetzt verknüpfen</span></div>
     </div>
     <!-- FEHLT BEREICH -->
@@ -2568,6 +2575,23 @@ function syncGlobalTNStatus(tnId, statusType){
 }
 
 let _poolDragId = null;
+let _hidePlaced = true; // Standard: platzierte ausblenden
+
+function toggleHidePlaced(){
+  _hidePlaced=!_hidePlaced;
+  const body=document.getElementById('poolSbBody');
+  if(_hidePlaced) body.classList.add('hide-placed');
+  else body.classList.remove('hide-placed');
+  // Zähler im Button aktualisieren
+  const btn=document.getElementById('poolHideBtn');
+  if(btn){
+    const total=body.querySelectorAll('.pool-card').length;
+    const placedN=body.querySelectorAll('.pool-card.placed').length;
+    const openN=total-placedN;
+    btn.textContent=_hidePlaced?'👁 Offen ('+openN+')':'👁 Alle ('+total+')';
+    if(_hidePlaced) btn.classList.add('active'); else btn.classList.remove('active');
+  }
+}
 let _wiederholerSeatId = null; // tracks local wiederholer card origin seat
 let _fehltLocal = false; // tracks if dragged card is a local fehlt entry
 let _poolDragTnId = null;
@@ -2580,6 +2604,11 @@ function loadPool(){
   const body = document.getElementById('poolSbBody');
   const hdr  = document.getElementById('poolSbHdr');
   if(!body) return;
+  // Hide-Placed Zustand beibehalten
+  if(_hidePlaced) body.classList.add('hide-placed');
+  else body.classList.remove('hide-placed');
+  const btn=document.getElementById('poolHideBtn');
+  if(btn){ btn.textContent=_hidePlaced?'👁 Offen':'👁 Alle'; if(_hidePlaced) btn.classList.add('active'); else btn.classList.remove('active'); }
 
   // Neue Generation – alle vorherigen async Callbacks werden ignoriert
   const gen = ++_poolLoadGen;
@@ -2668,6 +2697,12 @@ function loadPool(){
         card.addEventListener('dragend',()=>card.classList.remove('dragging'));
         body.appendChild(card);
       });
+      // Zähler aktualisieren
+      const placedCnt=allTN.filter(t=>placed.has(t.name.toLowerCase())).length;
+      const openCnt=allTN.length-placedCnt;
+      const cntEl=document.getElementById('poolHideBtn');
+      if(cntEl) cntEl.textContent=_hidePlaced?'👁 Offen ('+openCnt+')':'👁 Alle ('+allTN.length+')';
+      if(openCnt===0 && allTN.length) allBtn.style.display='none';
       setupSeatDropTargets();
       renderFehlt(kursId);
       renderWiederholer(kursId);
