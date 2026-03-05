@@ -464,7 +464,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
       <div style="flex:1"></div>
       <button class="sb-new-btn" onclick="openKursBuilder()">➕ Neuen Kurs erstellen</button>
-      <button class="sb-new-btn" onclick="openAddAusbModal()" style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);color:var(--acc);margin-top:4px">+ Neuer Ausbilder</button>
+      <button class="sb-new-btn" id="sbBtnNewAusb" onclick="openAddAusbModal()" style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);color:var(--acc);margin-top:4px">+ Neuer Ausbilder</button>
       <button class="sb-new-btn" onclick="openNewTNModal()" style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);color:#22c55e;margin-top:4px">+ Neuer Teilnehmer</button>
 
       <div class="sb-bot">
@@ -947,10 +947,12 @@ function grantAccess(u, role){
   // Badge zeigt Rolle
   const badge = document.getElementById('hdrBadge');
   if(badge) badge.textContent = role==='admin' ? 'ADMIN' : 'VERWALTUNG';
-  // Einstellungen nur für Admin
+  // Einstellungen + Ausbilder-Button nur für Admin
   if(role !== 'admin'){
     const settingsBtn = document.getElementById('nav-einstellungen');
     if(settingsBtn) settingsBtn.style.display='none';
+    const ausbBtn = document.getElementById('sbBtnNewAusb');
+    if(ausbBtn) ausbBtn.style.display='none';
   }
   loadAll();
   loadAusbilderEmails();
