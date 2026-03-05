@@ -2661,7 +2661,8 @@ function loadPool(){
       if(isStale()) return;
       if(snap.empty){ body.innerHTML='<div class="pool-empty">Keine Teilnehmer im Kurs</div>'; renderFehlt(kursId); renderWiederholer(kursId); return; }
       const seats = curSeats();
-      const placed = new Set(Object.values(seats).filter(d=>d&&d.name).map(d=>d.name.trim().toLowerCase()));
+      const placedNames = new Set(Object.values(seats).filter(d=>d&&d.name).map(d=>d.name.trim().toLowerCase()));
+      const placedTnIds = new Set(Object.values(seats).filter(d=>d&&d.poolTnId).map(d=>d.poolTnId));
       const allTN = [];
       body.innerHTML='';
       const allBtn = document.createElement('button');
@@ -2674,7 +2675,7 @@ function loadPool(){
         // Im Fehlt- oder Wiederholer-Container → nicht im Pool anzeigen
         if(d.status==='absent' || d.status==='wiederholer') return;
         const fullName = (d.vorname+' '+d.nachname).trim();
-        const isPlaced = placed.has(fullName.toLowerCase());
+        const isPlaced = placedTnIds.has(doc.id) || placedNames.has(fullName.toLowerCase());
         allTN.push({id:doc.id, name:fullName, company:d.firma||'', profession:d.beruf||'', ausbjahr:d.ausbjahr||''});
         const initials = fullName.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
         const card = document.createElement('div');
@@ -2698,8 +2699,9 @@ function loadPool(){
         body.appendChild(card);
       });
       // Zähler aktualisieren
-      const placedCnt=allTN.filter(t=>placed.has(t.name.toLowerCase())).length;
-      const openCnt=allTN.length-placedCnt;
+      const placedCnt=body.querySelectorAll('.pool-card.placed').length;
+      const totalCnt=body.querySelectorAll('.pool-card').length;
+      const openCnt=totalCnt-placedCnt;
       const cntEl=document.getElementById('poolHideBtn');
       if(cntEl) cntEl.textContent=_hidePlaced?'👁 Offen ('+openCnt+')':'👁 Alle ('+allTN.length+')';
       if(openCnt===0 && allTN.length) allBtn.style.display='none';
@@ -2715,8 +2717,9 @@ function poolPlaceAll(allTN, kursId){
   const rows = getRows(inst); const freeSeats = [];
   rows.forEach(row=>row.seats.forEach(sid=>{ const d=inst.seats[sid]; if(!d||!d.name) freeSeats.push(sid); }));
   const seats = curSeats();
-  const placed = new Set(Object.values(seats).filter(d=>d&&d.name).map(d=>d.name.trim().toLowerCase()));
-  const unplaced = allTN.filter(t=>!placed.has(t.name.toLowerCase()));
+  const placedNames = new Set(Object.values(seats).filter(d=>d&&d.name).map(d=>d.name.trim().toLowerCase()));
+  const placedTnIds = new Set(Object.values(seats).filter(d=>d&&d.poolTnId).map(d=>d.poolTnId));
+  const unplaced = allTN.filter(t=>!placedTnIds.has(t.id) && !placedNames.has(t.name.toLowerCase()));
   if(!unplaced.length){ alert('Alle Teilnehmer sind bereits platziert!'); return; }
   if(freeSeats.length < unplaced.length){
     if(!confirm(freeSeats.length+' freie Plätze, aber '+unplaced.length+' Teilnehmer. Es werden '+freeSeats.length+' platziert. Trotzdem?')) return;
