@@ -2514,7 +2514,11 @@ function renderMobKatList(){
     list.appendChild(row);
     const ch=document.createElement('div');
     ch.className='kat-ch'+(k.open?' open':'');
-    Object.entries(k.instances||{}).forEach(([iid,inst])=>{
+    Object.entries(k.instances||{}).sort(([,a],[,b])=>{
+      const da=a.sY+'-'+String(a.sM).padStart(2,'0')+'-'+String(a.sD).padStart(2,'0');
+      const db2=b.sY+'-'+String(b.sM).padStart(2,'0')+'-'+String(b.sD).padStart(2,'0');
+      return da<db2?-1:da>db2?1:0;
+    }).forEach(([iid,inst])=>{
       const active=S.curKat===id&&S.curInst===iid;
       const cnt=Object.values(inst.seats||{}).filter(d=>d&&d.name).length;
       const ir=document.createElement('div');
