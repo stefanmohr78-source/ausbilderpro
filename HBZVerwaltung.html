@@ -224,6 +224,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .sb-ausb-hdr:hover{background:rgba(59,130,246,.06);}
 .sb-ausb-hdr .sa{font-size:.55rem;color:var(--mu);transition:transform .15s;flex-shrink:0;}
 .sb-ausb-hdr.open .sa{transform:rotate(90deg);}
+.sb-eye-btn{background:none;border:1px solid var(--brd);border-radius:5px;cursor:pointer;font-size:.65rem;padding:2px 5px;margin:0 2px;color:var(--mu);transition:all .12s;flex-shrink:0;}
+.sb-eye-btn:hover{background:rgba(59,130,246,.1);color:var(--acc);border-color:var(--acc);}
 .sb-ausb-body{display:none;padding-left:10px;}
 .sb-ausb-body.open{display:block;}
 .sb-kurs{border-bottom:1px solid rgba(42,48,80,.25);}
@@ -611,6 +613,7 @@ service cloud.firestore {
       allow read: if isAdmin();
       match /{sub}/{subDoc} {
         allow read, write: if request.auth != null && request.auth.uid == uid;
+        allow read: if isAdmin();
       }
     }
 
@@ -799,6 +802,20 @@ service cloud.firestore {
 </div>
 
 <!-- TOAST -->
+<!-- AUSBILDER ANSICHT MODAL -->
+<div class="ov" id="ausbViewModal" onclick="if(event.target===this)this.classList.remove('open')">
+<div class="modal" style="max-width:800px;max-height:88vh">
+<div class="mhd">
+  <div class="mtit" id="ausbViewTitle">Ausbilder-Ansicht</div>
+  <span style="font-size:.6rem;background:rgba(59,130,246,.12);color:var(--acc);padding:2px 8px;border-radius:4px;font-family:'JetBrains Mono',monospace">READ-ONLY</span>
+  <button class="xcls" onclick="document.getElementById('ausbViewModal').classList.remove('open')">&#10005;</button>
+</div>
+<div class="mbdy" id="ausbViewBody" style="max-height:72vh;overflow-y:auto;padding:16px">
+  <div class="empty">Lädt…</div>
+</div>
+</div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1098,9 +1115,11 @@ function renderSbAusbTree(){
       const aHdr  = document.createElement('div'); aHdr.className = 'sb-ausb-hdr';
       const aBody = document.createElement('div'); aBody.className = 'sb-ausb-body';
 
+      const ausbEmail = (_ausbilder.find(x=>x.id===aId)||{}).email || '';
       aHdr.innerHTML =
         '<span class="sa">&#9654;</span><span>&#128100;</span>'
         + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis">' + esc(ausbData.name) + '</span>'
+        + (ausbEmail ? '<button class="sb-eye-btn" onclick="event.stopPropagation();openAusbView(\''+esc(ausbEmail)+'\',\''+esc(ausbData.name)+'\')" title="Sitzplan ansehen">👁</button>' : '')
         + '<span style="font-size:.6rem;color:var(--mu)">' + ausbData.kurse.length + ' LG</span>';
       aHdr.onclick = function(){ this.classList.toggle('open'); aBody.classList.toggle('open'); };
 
@@ -3064,6 +3083,98 @@ function loadAusbilderEmails(){
     const dl = document.getElementById('ausbilderEmailList');
     if(dl){ dl.innerHTML = _ausbilderEmails.map(e=>`<option value="${esc(e)}">`).join(''); }
   }).catch(()=>{});
+}
+
+// ── AUSBILDER READ-ONLY ANSICHT ──
+function openAusbView(email, name){
+  const modal=document.getElementById('ausbViewModal');
+  const title=document.getElementById('ausbViewTitle');
+  const body=document.getElementById('ausbViewBody');
+  title.textContent='👁 '+name;
+  body.innerHTML='<div class="empty">Lädt Daten für '+esc(email)+'…</div>';
+  modal.classList.add('open');
+
+  // 1. UID finden über users-Collection
+  db.collection('users').where('email','==',email).limit(1).get()
+    .then(snap=>{
+      if(snap.empty){ body.innerHTML='<div class="empty" style="color:#ef4444">Kein Konto gefunden für '+esc(email)+'.<br>Der Ausbilder hat sich noch nicht registriert.</div>'; return; }
+      const uid=snap.docs[0].id;
+      // 2. State laden
+      return db.collection('users').doc(uid).collection('data').doc('state').get();
+    })
+    .then(doc=>{
+      if(!doc) return; // snap was empty
+      if(!doc.exists){ body.innerHTML='<div class="empty">Noch keine Daten gespeichert.<br>Der Ausbilder muss zuerst AusbilderPro öffnen und Lehrgänge anlegen.</div>'; return; }
+      const s=doc.data().s;
+      if(!s){ body.innerHTML='<div class="empty">Leerer State</div>'; return; }
+      try{
+        const S=JSON.parse(s);
+        renderAusbView(S, name, body);
+      }catch(e){
+        body.innerHTML='<div class="empty" style="color:#ef4444">Fehler beim Parsen: '+esc(e.message)+'</div>';
+      }
+    })
+    .catch(err=>{ body.innerHTML='<div class="empty" style="color:#ef4444">Fehler: '+esc(err.message)+'</div>'; });
+}
+
+function renderAusbView(S, name, body){
+  let html='<div style="margin-bottom:14px;font-size:.72rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">Ausbilder: '+esc(S.ausbilder||name)+'</div>';
+
+  const katOrder=S.katOrder||Object.keys(S.kats||{});
+  if(!katOrder.length){ body.innerHTML='<div class="empty">Keine Lehrgangsarten angelegt</div>'; return; }
+
+  katOrder.forEach(katId=>{
+    const kat=S.kats[katId]; if(!kat) return;
+    const instances=Object.entries(kat.instances||{});
+    if(!instances.length) return;
+
+    html+='<div style="font-size:.82rem;font-weight:800;margin:16px 0 8px;color:var(--tx)">'+esc(kat.label)+'</div>';
+
+    instances.sort(([,a],[,b])=>{
+      const da=(a.sY||'')+'-'+String(a.sM||'').padStart(2,'0')+'-'+String(a.sD||'').padStart(2,'0');
+      const db2=(b.sY||'')+'-'+String(b.sM||'').padStart(2,'0')+'-'+String(b.sD||'').padStart(2,'0');
+      return da<db2?-1:da>db2?1:0;
+    }).forEach(([iid,inst])=>{
+      const von=inst.sD&&inst.sM&&inst.sY?String(inst.sD).padStart(2,'0')+'.'+String(inst.sM).padStart(2,'0')+'.'+inst.sY:'?';
+      const bis=inst.eD&&inst.eM&&inst.eY?String(inst.eD).padStart(2,'0')+'.'+String(inst.eM).padStart(2,'0')+'.'+inst.eY:'?';
+
+      // Sitzplätze mit Daten sammeln
+      const students=[];
+      (inst.rows||[]).forEach(r=>{
+        (r.seats||[]).forEach(sid=>{
+          const d=inst.seats[sid];
+          if(d&&d.name) students.push({sid,name:d.name,company:d.company||'',beruf:d.profession||'',att:d.attendance||[]});
+        });
+      });
+
+      html+='<div style="background:var(--sur2);border:1px solid var(--brd);border-radius:9px;padding:12px 14px;margin-bottom:10px">';
+      html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
+      html+='<div style="font-size:.75rem;font-weight:700;color:var(--acc)">'+esc(von)+' – '+esc(bis)+'</div>';
+      html+='<div style="font-size:.62rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+students.length+' Schüler</div>';
+      html+='</div>';
+
+      if(!students.length){
+        html+='<div style="font-size:.7rem;color:var(--mu);font-style:italic">Keine Schüler eingetragen</div>';
+      } else {
+        html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px">';
+        students.sort((a,b)=>a.name.localeCompare(b.name)).forEach(s=>{
+          const attCnt=s.att.length;
+          const pCnt=s.att.filter(e=>e.type==='present').length;
+          const pct=attCnt?Math.round((pCnt/attCnt)*100):0;
+          const col=pct>=80?'#22c55e':pct>=60?'#f59e0b':'#ef4444';
+          html+='<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--sur);border:1px solid var(--brd);border-radius:7px">';
+          html+='<div style="flex:1;min-width:0"><div style="font-size:.72rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(s.name)+'</div>';
+          html+='<div style="font-size:.58rem;color:var(--mu)">'+esc(s.company||s.beruf||'Platz '+s.sid)+'</div></div>';
+          if(attCnt) html+='<div style="font-size:.62rem;font-weight:800;color:'+col+';font-family:\'JetBrains Mono\',monospace">'+pct+'%</div>';
+          html+='</div>';
+        });
+        html+='</div>';
+      }
+      html+='</div>';
+    });
+  });
+
+  body.innerHTML=html;
 }
 
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
