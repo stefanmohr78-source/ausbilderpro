@@ -246,6 +246,13 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .sb-branche-hdr.open .sba{transform:rotate(90deg);}
 .sb-branche-body{display:none;padding-left:8px;}
 .sb-branche-body.open{display:block;}
+.sb-lj-hdr{display:flex;align-items:center;gap:6px;padding:5px 14px;cursor:pointer;font-size:.66rem;font-weight:700;color:var(--acc);letter-spacing:.03em;transition:background .12s;user-select:none;border-left:2px solid transparent;}
+.sb-lj-hdr:hover{background:rgba(59,130,246,.05);}
+.sb-lj-hdr.open{border-left-color:var(--acc);}
+.sb-lj-hdr .sba{transition:transform .15s;}
+.sb-lj-hdr.open .sba{transform:rotate(90deg);}
+.sb-lj-body{display:none;padding-left:6px;}
+.sb-lj-body.open{display:block;}
 .sb-lj-hdr{display:flex;align-items:center;gap:6px;padding:5px 10px;font-size:.7rem;font-weight:600;color:var(--mu);cursor:pointer;user-select:none;}
 .sb-lj-hdr:hover{color:var(--tx);}
 .sb-lj-hdr .slja{font-size:.52rem;transition:transform .15s;}
@@ -1347,20 +1354,37 @@ function renderSbTnTree(){
     if(!tns.length){
       body.innerHTML = '<div style="padding:4px 20px;font-size:.65rem;color:var(--mu);font-style:italic">Keine Teilnehmer</div>';
     } else {
-      // Absteigend nach Lehrjahr, dann alphabetisch nach Nachname
-      tns.sort((a,b)=>{
-        const ljA = parseInt(a.ausbjahr)||0;
-        const ljB = parseInt(b.ausbjahr)||0;
-        if(ljB !== ljA) return ljB - ljA;
-        return (a.nachname||'').localeCompare(b.nachname||'');
-      });
+      // Nach Lehrjahr gruppieren
+      const byLj = {};
       tns.forEach(t=>{
+        const lj = t.ausbjahr ? t.ausbjahr+'. Lehrjahr' : 'Ohne Lehrjahr';
+        if(!byLj[lj]) byLj[lj] = [];
+        byLj[lj].push(t);
+      });
+      // Sortiert: höchstes Lehrjahr zuerst, "Ohne" am Ende
+      const ljKeys = Object.keys(byLj).sort((a,b)=>{
+        const na=parseInt(a)||99, nb=parseInt(b)||99;
+        return nb-na;
+      });
+
+      ljKeys.forEach(ljKey=>{
+        const ljTns = byLj[ljKey];
+        ljTns.sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||''));
+
+        // Lehrjahr Sub-Header
+        const ljHdr = document.createElement('div');
+        ljHdr.className = 'sb-lj-hdr';
+        ljHdr.innerHTML = '<span class="sba" style="font-size:.45rem">&#9654;</span><span>'+esc(ljKey)+'</span><span style="margin-left:auto;font-size:.55rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+ljTns.length+'</span>';
+        const ljBody = document.createElement('div');
+        ljBody.className = 'sb-lj-body';
+        ljHdr.onclick = function(){ this.classList.toggle('open'); ljBody.classList.toggle('open'); };
+
+        ljTns.forEach(t=>{
         const name = ((t.vorname||'')[0]||'') + '. ' + (t.nachname||'');
         const inKurs = !!t.aktiverKursId;
         const isWdh = !!t.wiederholer;
         const isAbsent = t.status==='absent';
         const histCount = (t.kursHistory||[]).length + (inKurs && !(t.kursHistory||[]).some(h=>h.kursId===t.aktiverKursId) ? 1 : 0);
-        const ljTag = t.ausbjahr ? '<span style="font-size:.5rem;color:var(--mu);flex-shrink:0;font-family:\'JetBrains Mono\',monospace">'+t.ausbjahr+'.Lj</span>' : '';
         const cntTag = histCount ? '<span style="font-size:.5rem;font-weight:800;color:'+(histCount>=3?'#22c55e':histCount>=2?'#f59e0b':'var(--mu)')+';flex-shrink:0;font-family:\'JetBrains Mono\',monospace">'+histCount+'×</span>' : '';
         let statusBadge='';
         if(isAbsent) statusBadge='<span class="tn-inkurs" style="color:#ef4444">✗ Fehlt</span>';
@@ -1373,7 +1397,7 @@ function renderSbTnTree(){
         el.innerHTML =
           '<span class="drag-handle">⠿</span>' +
           '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(name) + '</span>' +
-          '<span style="display:flex;gap:4px;align-items:center;margin-left:auto;flex-shrink:0">' + ljTag + cntTag + '</span>' +
+          '<span style="display:flex;gap:4px;align-items:center;margin-left:auto;flex-shrink:0">' + cntTag + '</span>' +
           statusBadge;
         el.title = (t.vorname||'') + ' ' + (t.nachname||'') + (t.firma ? ' – ' + t.firma : '') + ' · ' + histCount + ' Lehrgang' + (histCount!==1?'e':'') + (inKurs ? ' (aktuell in Kurs)' : '');
         el.ondragstart = function(e){
@@ -1382,12 +1406,15 @@ function renderSbTnTree(){
           this.style.opacity = '.4';
         };
         el.ondragend = function(){ this.style.opacity = ''; };
-        // Klick öffnet Profil
         el.onclick = function(e){
           if(e.defaultPrevented) return;
           openTNProfile(t.id);
         };
-        body.appendChild(el);
+        ljBody.appendChild(el);
+        });
+
+        body.appendChild(ljHdr);
+        body.appendChild(ljBody);
       });
     }
 
