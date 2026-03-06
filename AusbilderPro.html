@@ -2160,9 +2160,7 @@ function addAtt(){
   tmpAtt.push(entry);
   tmpAtt.sort((a,b)=>a.date>b.date?-1:1);
   document.getElementById('aNote').value='';
-  // reset status selection and date so warning doesn't fire on save
-  curAttMain=null;
-  document.querySelectorAll('.ab-btn.active').forEach(b=>b.classList.remove('active'));
+  // Status-Auswahl BEIBEHALTEN für schnelles Eintragen mehrerer Tage
   renderAtt();
 }
 function toggleAe(el, e){
@@ -2247,8 +2245,8 @@ function saveSeat(){
   if(!curSeat||!S.curKat||!S.curInst)return;
   // Warn if user has selected date+status but not yet added the entry
   const dateVal=getDateFromSelects();
-  if(dateVal && curAttMain){
-    if(!confirm('Du hast einen offenen Anwesenheitseintrag der noch nicht hinzugefügt wurde.\n\nJetzt trotzdem speichern (Eintrag geht verloren)?'))return;
+  if(dateVal && curAttMain && !tmpAtt.some(a=>a.date===dateVal)){
+    if(!confirm('Du hast einen offenen Anwesenheitseintrag ('+dateVal+') der noch nicht hinzugefügt wurde.\n\nJetzt trotzdem speichern (Eintrag geht verloren)?'))return;
   }
   const inst=curInst();
   // collect fixed grades
