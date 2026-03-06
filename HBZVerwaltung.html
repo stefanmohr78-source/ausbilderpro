@@ -703,10 +703,14 @@ service cloud.firestore {
     }
 
     match /globalTN/{doc} {
-      allow read, write: if isAdmin();
-      // Ausbilder darf nur status + wiederholer Felder ändern (Sync aus AusbilderPro)
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+      // Ausbilder darf nur status + wiederholer Felder ändern
       allow update: if request.auth != null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'wiederholer']);
+      // Azubi darf eigenes Profilbild setzen
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photoUrl']);
       // TN-Dokumente (Krankmeldungen, Bescheinigungen)
       match /dokumente/{fileDoc} {
         allow read: if request.auth != null;
@@ -863,6 +867,15 @@ service cloud.firestore {
               <label style="display:flex;align-items:center;gap:6px;font-size:.78rem;cursor:pointer"><input type="checkbox" id="ntnVerkuerzer"> Verkurzer</label>
               <label style="display:flex;align-items:center;gap:6px;font-size:.78rem;cursor:pointer"><input type="checkbox" id="ntnWiederholer"> Vorjahres-Wiederholer</label>
             </div>
+            <!-- AZUBIPRO KONTO -->
+            <div style="margin-top:12px;padding:12px;background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:10px">
+              <label style="display:flex;align-items:center;gap:8px;font-size:.78rem;cursor:pointer;font-weight:600;color:#10b981">
+                <input type="checkbox" id="ntnCreateAccount" onchange="document.getElementById('ntnPwRow').style.display=this.checked?'':'none'"> 📱 AzubiPro-Konto erstellen
+              </label>
+              <div id="ntnPwRow" style="display:none;margin-top:8px">
+                <div class="fg"><label class="fl">Startpasswort *</label><input class="fi" id="ntnStartPw" type="text" placeholder="z.B. Azubi2026!" value="Azubi2026!" style="margin-bottom:0"></div>
+              </div>
+            </div>
             <button class="btn-sm btn-ok" id="ntnSaveBtn" onclick="saveNewGlobalTN()" style="width:100%;margin-top:12px">&#10003; Speichern</button>
           </div>
         </div>
@@ -944,6 +957,9 @@ firebase.initializeApp(FB_CFG);
 const auth = firebase.auth();
 const db   = firebase.firestore();
 const st   = firebase.storage();
+// Zweite Firebase-Instanz für Konto-Erstellung (ohne den Admin auszuloggen)
+const _secondaryApp = firebase.initializeApp(FB_CFG, 'secondary');
+const _secondaryAuth = _secondaryApp.auth();
 
 let _uid = null;
 let _email = null;
@@ -2674,7 +2690,11 @@ function openTNProfile(tnId){
   document.getElementById('tnModalTitle').textContent=name.trim();
   let html=
     '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">'+
-    '<div style="width:52px;height:52px;border-radius:50%;background:rgba(59,130,246,.15);border:3px solid rgba(59,130,246,.3);display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:800;color:var(--acc)">'+esc(init)+'</div>'+
+    '<div style="width:52px;height:52px;border-radius:50%;overflow:hidden;border:3px solid rgba(59,130,246,.3);flex-shrink:0">'
+    +(t.photoUrl
+      ?'<img src="'+esc(t.photoUrl)+'" style="width:100%;height:100%;object-fit:cover">'
+      :'<div style="width:100%;height:100%;background:rgba(59,130,246,.15);display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:800;color:var(--acc)">'+esc(init)+'</div>')
+    +'</div>'+
     '<div><div style="font-size:1.05rem;font-weight:800">'+esc(name.trim())+'</div>'+
     '<div style="font-size:.72rem;color:var(--mu)">'+(t.beruf||'')+(t.ausbjahr?' / '+t.ausbjahr+'. Lehrjahr':'')+'</div></div></div>'+
     '<div class="profile-field"><span class="pf-label">Betrieb</span><span>'+(t.firma||'–')+'</span></div>'+
@@ -2813,6 +2833,9 @@ function openNewTNModal(){
   const lj=document.getElementById('ntnLj');if(lj)lj.value='';
   document.getElementById('ntnVerkuerzer').checked=false;
   document.getElementById('ntnWiederholer').checked=false;
+  document.getElementById('ntnCreateAccount').checked=false;
+  document.getElementById('ntnPwRow').style.display='none';
+  document.getElementById('ntnStartPw').value='Azubi2026!';
   document.getElementById('newTNModalTitle').textContent='Neuen Teilnehmer anlegen';
   const btn=document.getElementById('ntnSaveBtn');if(btn){btn.textContent='Speichern';btn.onclick=saveNewGlobalTN;}
   document.getElementById('newTNModal').classList.add('open');
@@ -2823,19 +2846,91 @@ function closeNewTNModal(){document.getElementById('newTNModal').classList.remov
 function saveNewGlobalTN(){
   const vn=document.getElementById('ntnVN')?.value.trim();
   const nn=document.getElementById('ntnNN')?.value.trim();
+  const email=(document.getElementById('ntnEmail')?.value.trim()||'').toLowerCase();
   if(!vn||!nn){toast('Vor- und Nachname erforderlich','bad');return;}
-  db.collection('globalTN').add({
+
+  const createAccount=document.getElementById('ntnCreateAccount')?.checked;
+  const startPw=document.getElementById('ntnStartPw')?.value||'';
+  if(createAccount){
+    if(!email){toast('E-Mail ist erforderlich für AzubiPro-Konto','bad');return;}
+    if(startPw.length<6){toast('Startpasswort muss mindestens 6 Zeichen haben','bad');return;}
+  }
+
+  const tnData={
     vorname:vn,nachname:nn,
     firma:document.getElementById('ntnFirma')?.value.trim()||'',
     beruf:document.getElementById('ntnBeruf')?.value.trim()||'',
     ausbjahr:document.getElementById('ntnLj')?.value||'',
-    email:document.getElementById('ntnEmail')?.value.trim()||'',
+    email:email,
     tel:document.getElementById('ntnTel')?.value.trim()||'',
     verkuerzer:document.getElementById('ntnVerkuerzer')?.checked||false,
     wiederholer:document.getElementById('ntnWiederholer')?.checked||false,
     createdAt:Date.now()
-  }).then(()=>{toast('Gespeichert ✓');closeNewTNModal();})
-  .catch(err=>toast('Fehler: '+err.message,'bad'));
+  };
+
+  // 1. TN in Firestore speichern
+  db.collection('globalTN').add(tnData).then(ref=>{
+    if(createAccount){
+      // 2. Firebase Auth Konto erstellen (über sekundäre App)
+      return _secondaryAuth.createUserWithEmailAndPassword(email, startPw)
+        .then(cred=>{
+          // Rolle in users-Collection setzen
+          db.collection('users').doc(cred.user.uid).set({email:email, role:'azubi'},{merge:true}).catch(()=>{});
+          _secondaryAuth.signOut();
+          toast('TN + AzubiPro-Konto erstellt ✓');
+          closeNewTNModal();
+          // Zugangskarte drucken
+          printAccessCard(vn+' '+nn, email, startPw);
+        }).catch(err=>{
+          toast('TN gespeichert, aber Konto-Fehler: '+err.message,'bad');
+          closeNewTNModal();
+        });
+    } else {
+      toast('Gespeichert ✓');
+      closeNewTNModal();
+    }
+  }).catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+function printAccessCard(name, email, password){
+  const appUrl=window.location.href.replace(/[^/]*$/,'AzubiPro.html');
+  const w=window.open('','_blank','width=500,height=600');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Zugangsdaten</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI',sans-serif;padding:30px;background:#fff;color:#1a1a2e;}
+.card{border:3px solid #10b981;border-radius:16px;padding:28px;max-width:400px;margin:0 auto;}
+.logo{font-size:1.5rem;font-weight:800;text-align:center;margin-bottom:4px;}
+.logo span{color:#10b981;}
+.sub{font-size:.75rem;color:#666;text-align:center;margin-bottom:20px;}
+.field{margin-bottom:12px;}
+.label{font-size:.65rem;color:#888;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px;}
+.value{font-size:.95rem;font-weight:600;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px 12px;word-break:break-all;}
+.url{font-size:.72rem;font-family:monospace;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;word-break:break-all;margin-top:12px;}
+.hint{font-size:.7rem;color:#666;text-align:center;margin-top:16px;line-height:1.5;}
+.steps{font-size:.72rem;color:#444;margin-top:14px;padding:12px;background:#f8fafc;border-radius:8px;line-height:1.7;}
+@media print{body{padding:10px;}.card{border-width:2px;}}
+</style></head><body>
+<div class="card">
+<div class="logo">Azubi<span>Pro</span></div>
+<div class="sub">Dein Lehrgangsportal – Zugangsdaten</div>
+<div class="field"><div class="label">Name</div><div class="value">${name}</div></div>
+<div class="field"><div class="label">E-Mail (Login)</div><div class="value">${email}</div></div>
+<div class="field"><div class="label">Startpasswort</div><div class="value">${password}</div></div>
+<div class="url"><strong>Link:</strong> ${appUrl}</div>
+<div class="steps">
+<strong>📱 So installierst du die App:</strong><br>
+1. Öffne den Link oben im Browser<br>
+2. Melde dich mit E-Mail + Passwort an<br>
+3. <strong>iPhone:</strong> Teilen ⬆ → "Zum Home-Bildschirm"<br>
+4. <strong>Android:</strong> ⋮ Menü → "App installieren"<br>
+5. Bitte ändere dein Passwort unter 👤 Profil
+</div>
+<div class="hint">⚠ Bitte Passwort beim ersten Login ändern!</div>
+</div>
+</body></html>`);
+  w.document.close();
+  setTimeout(()=>w.print(),600);
 }
 
 function openEditTNModal(tnId){
