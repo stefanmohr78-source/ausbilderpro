@@ -804,9 +804,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 </div>
 
 <!-- SEAT MODAL -->
-<div class="ov" id="ov" onclick="if(event.target===this)closeModal()">
+<div class="ov" id="ov" onclick="if(event.target===this)safeCloseModal()">
   <div class="modal">
-    <div class="mhd"><div class="mtit" id="mtit">Sitzplatz</div><button class="xcls" onclick="closeModal()">✕</button></div>
+    <div class="mhd"><div class="mtit" id="mtit">Sitzplatz</div><button class="xcls" onclick="safeCloseModal()">✕</button></div>
     <div class="mbdy">
       <div class="tabs">
         <button class="tab active" onclick="stab('info')">📋 Person</button>
@@ -2135,6 +2135,8 @@ function openModal(id){
   curSeat=id;curAttMain=null;
   const d=curSeats()[id]||{};
   tmpAtt=JSON.parse(JSON.stringify(d.attendance||[]));
+  // Snapshot für Dirty-Check
+  _modalSnapshot={name:d.name||'',company:d.company||'',profession:d.profession||'',ausbjahr:d.ausbjahr||'',note:d.note||'',attLen:(d.attendance||[]).length};
   document.getElementById('mtit').textContent='Sitzplatz '+id;
   document.getElementById('iName').value=d.name||'';
   document.getElementById('iCo').value=d.company||'';
@@ -2158,7 +2160,25 @@ function openModal(id){
   document.querySelector('.tab[onclick="stab(\'docs\')"]').onclick = ()=>{ stab('docs'); docsLoadList('seat'); };
   document.getElementById('ov').classList.add('open');
 }
-function closeModal(){document.getElementById('ov').classList.remove('open');curSeat=null;}
+let _modalSnapshot=null;
+function _seatModalDirty(){
+  if(!_modalSnapshot) return false;
+  const s=_modalSnapshot;
+  if((document.getElementById('iName').value||'')!==s.name) return true;
+  if((document.getElementById('iCo').value||'')!==s.company) return true;
+  if((document.getElementById('iProf').value||'')!==s.profession) return true;
+  if((document.getElementById('iAusbjahr').value||'')!==s.ausbjahr) return true;
+  if((document.getElementById('iNote').value||'')!==s.note) return true;
+  if(tmpAtt.length!==s.attLen) return true;
+  return false;
+}
+function safeCloseModal(){
+  if(_seatModalDirty()){
+    if(!confirm('Änderungen verwerfen? Nicht gespeicherte Daten gehen verloren.')) return;
+  }
+  closeModal();
+}
+function closeModal(){document.getElementById('ov').classList.remove('open');curSeat=null;_modalSnapshot=null;}
 function stab(t){
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.tp').forEach(x=>x.classList.remove('active'));
