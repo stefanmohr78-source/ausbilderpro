@@ -92,6 +92,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .sb-sec{padding:10px 12px 4px;font-family:'JetBrains Mono',monospace;font-size:.56rem;color:#8896b0;text-transform:uppercase;letter-spacing:.12em;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
 .sb-add-kat{background:none;border:none;color:var(--acc);font-size:.9rem;cursor:pointer;padding:2px 5px;border-radius:4px;opacity:.7;transition:opacity .13s;line-height:1;}
 .sb-add-kat:hover{opacity:1;}
+.sb-abruf-btn{display:block;width:calc(100% - 24px);margin:8px 12px;padding:8px 12px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);border:none;border-radius:8px;color:#fff;font-family:'Sora',sans-serif;font-size:.72rem;font-weight:700;cursor:pointer;text-align:center;transition:all .15s;}
+.sb-abruf-btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(59,130,246,.35);}
 
 /* HBZ-KURSE SIDEBAR */
 .hbz-sec{padding:10px 12px 4px;font-family:'JetBrains Mono',monospace;font-size:.56rem;color:var(--acc);text-transform:uppercase;letter-spacing:.12em;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px dashed rgba(59,130,246,.25);}
@@ -612,6 +614,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div id="mobSearchDrop" style="margin-top:5px;"></div>
   </div>
   <div id="hbzKurseSectionMob" style="flex-shrink:0"></div>
+  <button class="sb-abruf-btn" onclick="drawerClose();openLehrgangAbrufen()" style="margin:6px 12px">📥 Lehrgänge abrufen</button>
   <div class="sb-sec" style="flex-shrink:0;">Lehrgangsarten <button class="sb-add-kat" onclick="drawerClose();openKatModal()">+</button></div>
   <div class="mob-drawer-scroll" id="mobKatList"></div>
 </div>
@@ -634,6 +637,16 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <div id="changelogBody"></div>
 </div>
 </div>
+</div>
+
+<!-- LEHRGÄNGE ABRUFEN MODAL -->
+<div class="ov" id="abrufModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal" style="max-width:460px">
+    <div class="mhd"><div class="mtit">📥 Lehrgänge abrufen</div><button class="xcls" onclick="document.getElementById('abrufModal').classList.remove('open')">&#10005;</button></div>
+    <div class="mbdy" id="abrufBody" style="max-height:65vh;overflow-y:auto">
+      <div style="text-align:center;padding:20px;color:var(--mu)">Lädt…</div>
+    </div>
+  </div>
 </div>
 
 <!-- GOOGLE DRIVE MODAL -->
@@ -684,6 +697,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <div class="wrap">
   <div class="sb" id="sb">
     <div id="hbzKurseSection"></div>
+    <button class="sb-abruf-btn" onclick="openLehrgangAbrufen()">📥 Lehrgänge abrufen</button>
     <div class="sb-sec">Lehrgangsarten <button class="sb-add-kat" onclick="openKatModal()" title="Hinzufügen / Wiederherstellen">+</button></div>
     <div id="katList"></div>
   </div>
@@ -1245,6 +1259,82 @@ function getLinkedKursIds(){
   return linked;
 }
 
+// ── LEHRGÄNGE ABRUFEN ──
+function checkAvailableLehrgaenge(){
+  const statusEl=document.getElementById('esAbrufStatus');
+  if(!_db||!_auth||!_auth.currentUser){ if(statusEl) statusEl.textContent='⚠ Offline – Anmeldung erforderlich'; return; }
+  _db.collection('shared').doc('kurse').collection('list')
+    .where('ausbilderEmail','==',_auth.currentUser.email.toLowerCase())
+    .get().then(snap=>{
+      const linked=getLinkedKursIds();
+      let count=0;
+      snap.forEach(doc=>{ if(!linked.has(doc.id)) count++; });
+      if(statusEl){
+        if(count>0) statusEl.innerHTML='<span style="color:#22c55e;font-weight:700">✓ '+count+' Lehrgang'+(count>1?'e':'')+' verfügbar</span>';
+        else statusEl.textContent='Aktuell keine neuen Lehrgänge zugewiesen.';
+      }
+    }).catch(()=>{ if(statusEl) statusEl.textContent='Verbindungsfehler'; });
+}
+
+function openLehrgangAbrufen(){
+  const modal=document.getElementById('abrufModal');
+  const body=document.getElementById('abrufBody');
+  body.innerHTML='<div style="text-align:center;padding:20px;color:var(--mu)">Lädt Lehrgänge…</div>';
+  modal.classList.add('open');
+
+  if(!_db||!_auth||!_auth.currentUser){
+    body.innerHTML='<div style="text-align:center;padding:20px;color:#ef4444">Nicht angemeldet.</div>';
+    return;
+  }
+
+  _db.collection('shared').doc('kurse').collection('list')
+    .where('ausbilderEmail','==',_auth.currentUser.email.toLowerCase())
+    .get().then(snap=>{
+      const linked=getLinkedKursIds();
+      const unlinked=[];
+      snap.forEach(doc=>{
+        if(!linked.has(doc.id)) unlinked.push({id:doc.id,...doc.data()});
+      });
+
+      if(!unlinked.length){
+        body.innerHTML='<div style="text-align:center;padding:30px;color:var(--mu)">'
+          +'<div style="font-size:2rem;margin-bottom:8px">✓</div>'
+          +'<div style="font-weight:700">Alles aktuell</div>'
+          +'<div style="font-size:.75rem;margin-top:4px">Keine neuen Lehrgänge vorhanden.<br>Die Verwaltung kann dir jederzeit neue Lehrgänge zuweisen.</div></div>';
+        return;
+      }
+
+      body.innerHTML='<div style="font-size:.72rem;color:var(--mu);margin-bottom:12px">'+unlinked.length+' Lehrgang'+(unlinked.length>1?'e':'')+' von der Verwaltung zugewiesen. Tippe auf einen Lehrgang um ihn zu übernehmen.</div>';
+      unlinked.forEach(k=>{
+        const lgart=k.lehrgangsart||k.name||'Kurs';
+        const vonBis=fmtDE(k.von)+' – '+fmtDE(k.bis);
+        const tnCount=k.tnCount||'?';
+        const card=document.createElement('div');
+        card.style.cssText='display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--sur2);border:2px solid var(--brd);border-radius:10px;margin-bottom:8px;cursor:pointer;transition:all .12s;';
+        card.innerHTML=
+          '<div style="width:42px;height:42px;border-radius:10px;background:rgba(59,130,246,.12);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0">📋</div>'
+          +'<div style="flex:1;min-width:0">'
+          +'<div style="font-weight:700;font-size:.85rem">'+esc(lgart)+'</div>'
+          +'<div style="font-size:.68rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace;margin-top:2px">'+esc(vonBis)+'</div>'
+          +'</div>'
+          +'<div style="font-size:.72rem;color:var(--acc);font-weight:700;flex-shrink:0">Übernehmen →</div>';
+        card.onmouseenter=function(){this.style.borderColor='var(--acc)';this.style.background='rgba(59,130,246,.05)';};
+        card.onmouseleave=function(){this.style.borderColor='var(--brd)';this.style.background='var(--sur2)';};
+        card.onclick=function(){ abrufKurs(k.id, k); };
+        body.appendChild(card);
+      });
+    }).catch(err=>{
+      body.innerHTML='<div style="text-align:center;padding:20px;color:#ef4444">Fehler: '+esc(err.message)+'</div>';
+    });
+}
+
+function abrufKurs(kursId, kursData){
+  const lgart=kursData.lehrgangsart||kursData.name||'Kurs';
+  if(!confirm('Lehrgang "'+lgart+'" übernehmen?')) return;
+  document.getElementById('abrufModal').classList.remove('open');
+  linkHBZKurs(kursId, kursData, null);
+}
+
 function loadHBZKurse(){
   const section=document.getElementById('hbzKurseSection');
   const sectionMob=document.getElementById('hbzKurseSectionMob');
@@ -1458,7 +1548,30 @@ function renderMain(){
   const inst=curInst();
   if(!inst){
     const katName=S.curKat&&S.kats[S.curKat]?S.kats[S.curKat].label:null;
-    el.innerHTML='<div class="es">'+(katName?'<h2>'+esc(katName)+'</h2><p>Noch kein Lehrgang angelegt.<br>Klicke links auf <b>+ Neuer Lehrgang</b>.</p><button class="es-btn" onclick="openDp(\''+ S.curKat +'\')">+ Neuer Lehrgang</button>':'<h2>Willkommen bei AusbilderPro</h2><p>Lege links eine <b>Lehrgangsart</b> an (z.B. Elektroniker oder Mechatroniker) und fuege dann Lehrgaenge mit Start- und Enddatum hinzu.</p><button class="es-btn" onclick="openKatModal()">+ Erste Lehrgangsart anlegen</button>')+ '</div>';
+    const hasAnyInst=Object.values(S.kats).some(k=>Object.keys(k.instances||{}).length>0);
+    if(katName){
+      // Hat Lehrgangsart, aber kein Lehrgang darin
+      el.innerHTML='<div class="es"><h2>'+esc(katName)+'</h2><p>Noch kein Lehrgang angelegt.</p><button class="es-btn" onclick="openDp(\''+ S.curKat +'\')">+ Neuer Lehrgang</button></div>';
+    } else if(!hasAnyInst){
+      // Komplett leer → Willkommensscreen mit Lehrgänge abrufen
+      el.innerHTML=
+        '<div class="es" style="max-width:420px;margin:0 auto">'
+        +'<div style="font-size:2.5rem;margin-bottom:12px">📋</div>'
+        +'<h2 style="color:var(--tx);margin-bottom:8px">Willkommen bei AusbilderPro</h2>'
+        +'<p style="line-height:1.7;margin-bottom:20px">Lehrgänge werden von der Verwaltung für dich angelegt.<br>Klicke unten um deine zugewiesenen Lehrgänge abzurufen.</p>'
+        +'<button class="es-btn" onclick="openLehrgangAbrufen()" id="esAbrufBtn" style="font-size:.95rem;padding:14px 28px;background:linear-gradient(135deg,#1d4ed8,#3b82f6)">📥 Lehrgänge abrufen</button>'
+        +'<div id="esAbrufStatus" style="margin-top:12px;font-size:.72rem;color:var(--mu)"></div>'
+        +'<div style="margin-top:28px;border-top:1px solid var(--brd);padding-top:16px">'
+        +'<div style="font-size:.65rem;color:var(--mu);margin-bottom:8px">Oder manuell anlegen:</div>'
+        +'<button class="es-btn" onclick="openKatModal()" style="font-size:.75rem;padding:9px 18px;background:var(--sur2);color:var(--mu);box-shadow:none">+ Eigene Lehrgangsart anlegen</button>'
+        +'</div></div>';
+      // Automatisch prüfen ob Lehrgänge verfügbar
+      checkAvailableLehrgaenge();
+    } else {
+      // Hat Lehrgänge, aber keinen ausgewählt
+      el.innerHTML='<div class="es"><h2>AusbilderPro</h2><p>Wähle links einen Lehrgang aus.</p>'
+        +'<button class="es-btn" onclick="openLehrgangAbrufen()" style="margin-top:12px">📥 Neue Lehrgänge abrufen</button></div>';
+    }
     return;
   }
   el.innerHTML=
