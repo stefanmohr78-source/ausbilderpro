@@ -2159,6 +2159,71 @@ function openModal(id){
   // Docs tab laden wenn aktiv
   document.querySelector('.tab[onclick="stab(\'docs\')"]').onclick = ()=>{ stab('docs'); docsLoadList('seat'); };
   document.getElementById('ov').classList.add('open');
+  // Auto-resolve poolTnId wenn Name vorhanden aber keine ID
+  resolvePoolTnId(id, d);
+}
+
+// Sucht die globalTN-ID für manuell eingetragene TN (ohne Pool-Drag)
+function resolvePoolTnId(seatId, seatData){
+  if(!_db || !seatData.name || seatData.poolTnId) return;
+  const inst=curInst(); if(!inst) return;
+  const kursId=inst.sharedKursId;
+  if(!kursId) return;
+  const parts=seatData.name.trim().split(/\s+/);
+  if(parts.length<2) return;
+  const nachname=parts[parts.length-1];
+  _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+    .collection('teilnehmer').where('nachname','==',nachname).get()
+    .then(snap=>{
+      if(snap.empty) return;
+      const normSeat=seatData.name.trim().toLowerCase();
+      let match=null;
+      snap.forEach(doc=>{
+        const d=doc.data();
+        const fullName=((d.vorname||'')+' '+(d.nachname||'')).trim().toLowerCase();
+        if(fullName===normSeat) match=doc.id;
+      });
+      if(match){
+        inst.seats[seatId].poolTnId=match;
+        inst.seats[seatId].poolKursId=kursId;
+        persist();
+      }
+    }).catch(()=>{});
+}
+
+// Batch-Resolve: alle Seats aller Instanzen prüfen
+function resolveAllPoolTnIds(){
+  if(!_db) return;
+  Object.entries(S.kats).forEach(([katId,kat])=>{
+    Object.entries(kat.instances||{}).forEach(([instId,inst])=>{
+      const kursId=inst.sharedKursId;
+      if(!kursId) return;
+      const seatsToResolve=[];
+      Object.entries(inst.seats||{}).forEach(([sid,d])=>{
+        if(d&&d.name&&!d.poolTnId) seatsToResolve.push({sid,name:d.name});
+      });
+      if(!seatsToResolve.length) return;
+      // Alle TN des Kurses laden
+      _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+        .collection('teilnehmer').get().then(snap=>{
+          const tnMap={};
+          snap.forEach(doc=>{
+            const d=doc.data();
+            tnMap[((d.vorname||'')+' '+(d.nachname||'')).trim().toLowerCase()]=doc.id;
+          });
+          let changed=false;
+          seatsToResolve.forEach(s=>{
+            const id=tnMap[s.name.trim().toLowerCase()];
+            if(id){
+              inst.seats[s.sid].poolTnId=id;
+              inst.seats[s.sid].poolKursId=kursId;
+              changed=true;
+            }
+          });
+          if(changed) persist();
+        }).catch(()=>{});
+    });
+  });
 }
 let _modalSnapshot=null;
 function _seatModalDirty(){
@@ -3717,6 +3782,7 @@ function fbLoadData(){
       renderAll();
       loadHBZKurse();
       loadBerufeFromFirestore();
+      resolveAllPoolTnIds();
       ci.textContent='☁ '+(_auth.currentUser?.email?.split('@')[0]||'');
     })
     .catch(()=>{
