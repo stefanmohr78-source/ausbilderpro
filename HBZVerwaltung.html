@@ -2743,11 +2743,33 @@ function openTNProfile(tnId){
       (t.verkuerzer?'<span style="background:rgba(99,102,241,.12);color:#6366f1;padding:2px 7px;border-radius:8px;font-size:.7rem;font-weight:700">Verkuerzer</span> ':'')+
       (t.wiederholer?'<span style="background:rgba(245,158,11,.12);color:#d97706;padding:2px 7px;border-radius:8px;font-size:.7rem;font-weight:700">Wiederholer</span>':'')+'</span></div>';
   }
-  html+='<div style="font-size:.7rem;font-weight:700;letter-spacing:.06em;color:var(--mu);margin:16px 0 8px">KURSHISTORIE ('+hist.length+')</div>';
-  html+=hist.length?hist.map((h,i)=>
-    '<div class="history-item">'+(i===0&&t.aktiverKursId===h.kursId?'<span style="float:right;font-size:.65rem;color:#22c55e">Aktuell</span>':'')+
-    '<div class="hi-name">'+esc(h.kursName||h.kursId)+'</div>'+
-    '<div class="hi-meta">'+fmtDE(h.von)+' – '+fmtDE(h.bis)+'</div></div>').join(''):
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px">'
+    +'<div style="font-size:.7rem;font-weight:700;letter-spacing:.06em;color:var(--mu)">KURSHISTORIE ('+hist.length+')</div>'
+    +'<button class="btn-sm btn-ok" onclick="toggleNachtragenForm(\''+tnId+'\')" style="font-size:.6rem;padding:3px 8px">+ Nachtragen</button></div>';
+  // Nachtragen-Formular (hidden)
+  html+='<div id="nachtragenForm" style="display:none;background:var(--sur2);border:1px solid var(--brd);border-radius:10px;padding:12px;margin-bottom:10px">'
+    +'<div style="font-size:.72rem;font-weight:700;margin-bottom:8px">📋 Vergangenen Lehrgang nachtragen</div>'
+    +'<div class="form-row" style="gap:6px;margin-bottom:6px">'
+    +'<div class="fg" style="flex:1"><label class="fl">Lehrgangsart *</label><select class="fi" id="ntKursName" style="font-size:.78rem"><option value="">– wählen –</option></select></div>'
+    +'</div>'
+    +'<div class="form-row" style="gap:6px;margin-bottom:6px">'
+    +'<div class="fg" style="flex:1"><label class="fl">Von *</label><input class="fi" type="date" id="ntVon" style="font-size:.78rem"></div>'
+    +'<div class="fg" style="flex:1"><label class="fl">Bis *</label><input class="fi" type="date" id="ntBis" style="font-size:.78rem"></div>'
+    +'</div>'
+    +'<div class="form-row" style="gap:6px">'
+    +'<button class="btn-sm" onclick="document.getElementById(\'nachtragenForm\').style.display=\'none\'" style="flex:1;font-size:.7rem">Abbrechen</button>'
+    +'<button class="btn-sm btn-ok" onclick="saveNachtragen(\''+tnId+'\')" style="flex:1;font-size:.7rem">✓ Nachtragen</button>'
+    +'</div></div>';
+  html+=hist.length?hist.map((h,i)=>{
+    const isManual=!!h.manual;
+    return '<div class="history-item" style="position:relative">'
+    +(i===0&&t.aktiverKursId===h.kursId?'<span style="float:right;font-size:.65rem;color:#22c55e">Aktuell</span>':'')
+    +(isManual?'<span style="float:right;font-size:.55rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">manuell</span>':'')
+    +'<div class="hi-name">'+esc(h.kursName||h.kursId)+'</div>'
+    +'<div class="hi-meta">'+fmtDE(h.von)+' – '+fmtDE(h.bis)+'</div>'
+    +(isManual?'<button onclick="deleteNachtrag(\''+tnId+'\','+i+')" style="position:absolute;top:4px;right:4px;background:none;border:none;color:var(--bad);cursor:pointer;font-size:.7rem;padding:2px 4px" title="Entfernen">✕</button>':'')
+    +'</div>';
+  }).join(''):
     '<div class="empty" style="padding:12px">Noch keine Kurshistorie</div>';
   // Anwesenheits-Sektion (wird async nachgeladen)
   html+='<div id="tnProfileAtt" style="margin-top:12px"></div>';
@@ -2861,6 +2883,68 @@ function tnDocsDelete(docId, storagePath, tnId){
   firebase.storage().ref(storagePath).delete().catch(()=>{});
   db.collection('globalTN').doc(tnId).collection('dokumente').doc(docId).delete()
     .then(()=>loadTNProfileDocs(tnId))
+    .catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+// ── KURSHISTORIE NACHTRAGEN ──
+function toggleNachtragenForm(tnId){
+  const form=document.getElementById('nachtragenForm');
+  if(!form) return;
+  form.style.display=form.style.display==='none'?'':'none';
+  // Lehrgangsarten-Dropdown befüllen
+  const sel=document.getElementById('ntKursName');
+  if(sel&&sel.options.length<=1){
+    _lehrgangsarten.forEach(lg=>{
+      const o=document.createElement('option');
+      o.value=lg.name; o.textContent=lg.name;
+      sel.appendChild(o);
+    });
+    // Falls keine Lehrgangsarten → Freitext-Option
+    if(!_lehrgangsarten.length){
+      sel.innerHTML='<option value="">– keine Lehrgangsarten angelegt –</option>';
+    }
+  }
+}
+
+function saveNachtragen(tnId){
+  const kursName=(document.getElementById('ntKursName')?.value||'').trim();
+  const von=document.getElementById('ntVon')?.value||'';
+  const bis=document.getElementById('ntBis')?.value||'';
+  if(!kursName){toast('Bitte Lehrgangsart wählen','bad');return;}
+  if(!von||!bis){toast('Bitte Von- und Bis-Datum eingeben','bad');return;}
+
+  const t=_globalTN.find(x=>x.id===tnId);
+  if(!t){toast('TN nicht gefunden','bad');return;}
+
+  const hist=t.kursHistory||[];
+  hist.push({
+    kursName: kursName,
+    kursId: 'manual_'+Date.now(),
+    von: von,
+    bis: bis,
+    addedAt: Date.now(),
+    manual: true
+  });
+
+  db.collection('globalTN').doc(tnId).update({kursHistory:hist})
+    .then(()=>{
+      toast('Lehrgang nachgetragen ✓');
+      openTNProfile(tnId);
+    })
+    .catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+function deleteNachtrag(tnId, index){
+  if(!confirm('Diesen nachgetragenen Lehrgang entfernen?')) return;
+  const t=_globalTN.find(x=>x.id===tnId);
+  if(!t) return;
+  const hist=(t.kursHistory||[]).slice();
+  hist.splice(index,1);
+  db.collection('globalTN').doc(tnId).update({kursHistory:hist})
+    .then(()=>{
+      toast('Entfernt');
+      openTNProfile(tnId);
+    })
     .catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
