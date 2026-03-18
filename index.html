@@ -370,22 +370,21 @@ textarea.cf-input{resize:vertical;min-height:100px;}
     <div class="section-tag">Kontakt</div>
     <div class="section-title">Interesse? Fragen?</div>
     <div class="section-sub" style="margin:8px auto 0">Schreiben Sie uns – wir melden uns innerhalb von 24 Stunden.</div>
-    <form class="contact-form" action="https://formspree.io/f/placeholder" method="POST">
+    <form class="contact-form" onsubmit="sendContact(event)">
       <div class="cf-row">
-        <input class="cf-input" name="name" placeholder="Ihr Name" required>
-        <input class="cf-input" name="organization" placeholder="Bildungszentrum / Organisation">
+        <input class="cf-input" id="cfName" placeholder="Ihr Name" required>
+        <input class="cf-input" id="cfOrg" placeholder="Bildungszentrum / Organisation">
       </div>
-      <input class="cf-input" name="email" type="email" placeholder="E-Mail-Adresse" required>
-      <input class="cf-input" name="phone" type="tel" placeholder="Telefon (optional)">
-      <select class="cf-input" name="interest">
+      <input class="cf-input" id="cfEmail" type="email" placeholder="E-Mail-Adresse" required>
+      <select class="cf-input" id="cfInterest">
         <option value="">Wofür interessieren Sie sich?</option>
-        <option value="demo">Demo testen</option>
-        <option value="ausbilderpro">AusbilderPro (1,99 €/Monat)</option>
-        <option value="komplett">Komplett-Paket (29 €/Monat)</option>
-        <option value="enterprise">Individuelle Lösung</option>
-        <option value="frage">Allgemeine Frage</option>
+        <option value="Demo testen">Demo testen</option>
+        <option value="AusbilderPro (1,99 €/Monat)">AusbilderPro (1,99 €/Monat)</option>
+        <option value="Komplett-Paket (29 €/Monat)">Komplett-Paket (29 €/Monat)</option>
+        <option value="Individuelle Lösung">Individuelle Lösung</option>
+        <option value="Allgemeine Frage">Allgemeine Frage</option>
       </select>
-      <textarea class="cf-input" name="message" placeholder="Ihre Nachricht…"></textarea>
+      <textarea class="cf-input" id="cfMsg" placeholder="Ihre Nachricht…"></textarea>
       <button type="submit" class="cf-submit">📨 Nachricht senden</button>
     </form>
   </div>
@@ -418,6 +417,22 @@ window.addEventListener('scroll',()=>{
 document.querySelectorAll('.nav-links a').forEach(a=>{
   a.addEventListener('click',()=>document.querySelector('.nav-links').classList.remove('mob-open'));
 });
+// Contact form → mailto
+function sendContact(e){
+  e.preventDefault();
+  const name=document.getElementById('cfName').value.trim();
+  const org=document.getElementById('cfOrg').value.trim();
+  const email=document.getElementById('cfEmail').value.trim();
+  const interest=document.getElementById('cfInterest').value;
+  const msg=document.getElementById('cfMsg').value.trim();
+  const subject=encodeURIComponent('Anfrage über ausbilderpro.de'+(interest?' – '+interest:''));
+  let body='Name: '+name+'\n';
+  if(org) body+='Organisation: '+org+'\n';
+  body+='E-Mail: '+email+'\n';
+  if(interest) body+='Interesse: '+interest+'\n';
+  body+='\n'+msg;
+  window.location.href='mailto:info@ausbilderpro.de?subject='+subject+'&body='+encodeURIComponent(body);
+}
 </script>
 </body>
 </html>
