@@ -2010,7 +2010,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v903';
+const APP_VERSION = 'v905';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2025,6 +2025,8 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v905', d:'07.09.2026', items:['⛔ Kurs-Check ab dem 3. Kurstag verbindlich: Teilnehmer ohne jede Einordnung – auch solche, die nur im Pool liegen – müssen als „Wiederholer" oder „Nicht angetreten" eingestuft werden; „✓ Ist doch da" bleibt immer möglich. Nachträglich zugewiesene Teilnehmer lösen den Zwang nicht aus']},
+  {v:'v904', d:'07.09.2026', items:['👉 Unplatzierte Teilnehmer im Pool bekommen ab dem 2. Kurstag zwei Knöpfe direkt auf der Karte: „Wiederholer" und „Nicht angetreten" – kein Ziehen mehr nötig, keine zusätzliche Markierung (der rote Rahmen bleibt wie gehabt). Es öffnen sich dieselben Dialoge wie beim Ziehen']},
   {v:'v903', d:'07.09.2026', items:['⚠️ „Alle anwesend" fragt jetzt mit Klartext nach: zeigt vorab die Namen der Teilnehmer, die dadurch neu auf anwesend gesetzt würden, nennt die Anzahl bereits eingecheckter und warnt, dass der Knopf zum Nachtragen leerer Tage gedacht ist – nicht zum morgendlichen Vorab-Eintragen']},
   {v:'v902', d:'07.09.2026', items:['🔎 Live-Sync-Einträge zeigen jetzt ihre Herkunft: statt „per Live-Sync" steht z.B. „✓ von Hand – s.mohr (Handy)". So ist sofort erkennbar, von welchem Gerät ein Anwesend-Eintrag kam, der nicht per QR entstanden ist']},
   {v:'v901', d:'07.09.2026', items:['✨ Zugeklappte Kurse in der Kursliste blinken sanft grün und bekommen einen Punkt, wenn darin gerade ein Lehrgang läuft – auch in der Mobil-Ansicht']},
@@ -4592,6 +4594,20 @@ function _kursCheckOffene(inst){
       if(!hasAny) hasAny=Object.keys(attMap).some(ds=>ds>=start&&ds<=today&&attMap[ds]&&attMap[ds][id]);
       if(!hasAny) out.push({sid:id, name:d.name, company:d.company||'', tnId:d.poolTnId||null, abgelehnt:!!d.kenntnisAbgelehnt});
     });
+    // v905: auch NICHT platzierte Pool-TN aufnehmen. Schutzregel: nur solche, die schon
+    // vor Kursbeginn/am Kursstart zugewiesen waren - spaeter zugewiesene TN (Nachzuegler)
+    // sollen den Ausbilder nicht mitten im Kurs blockieren.
+    try{
+      const platzierte=new Set(Object.values(inst.seats||{}).filter(x=>x&&x.poolTnId).map(x=>x.poolTnId));
+      const startTs=new Date(start+'T23:59:59').getTime();
+      (_poolTNCache||[]).forEach(t=>{
+        if(!t||!t.id||platzierte.has(t.id)) return;
+        const cs=_tnStatusMap[t.id]||'';
+        if(cs==='wiederholer'||cs==='absent') return;
+        if(t.addedAt && t.addedAt>startTs) return;      // Nachzuegler ausnehmen
+        out.push({sid:null, tnId:t.id, name:t.name||'?', company:t.firma||'', abgelehnt:false, ausPool:true});
+      });
+    }catch(e){}
     out.sort((a,b)=>a.name.localeCompare(b.name,'de'));
   }catch(e){}
   return out;
@@ -4639,20 +4655,43 @@ function _syncKursKenntnis(inst){
 function maybeKursCheck(){
   const inst=curInst(); if(!inst) return;
   const today=new Date().toISOString().slice(0,10);
-  if(inst.kursCheckSeen&&inst.kursCheckSeen[today]) return;
   const offen=_kursCheckOffene(inst);
   if(!offen.length) return;
+  // v905: Ab dem 3. Kurstag ist die Einordnung VERBINDLICH - der Hinweis laesst sich dann
+  // nicht mehr wegklicken und kommt bei jedem Oeffnen, bis alle Faelle entschieden sind.
+  const start=(inst.sY&&inst.sM&&inst.sD)?(inst.sY+'-'+String(inst.sM).padStart(2,'0')+'-'+String(inst.sD).padStart(2,'0')):null;
+  let kurstage=0;
+  if(start){ const d=new Date(start+'T12:00'); const h=new Date(today+'T12:00');
+    while(d<=h){ const wd=d.getDay(); if(wd!==0&&wd!==6) kurstage++; d.setDate(d.getDate()+1); } }
+  const pflicht = kurstage>=3;
+  if(!pflicht && inst.kursCheckSeen && inst.kursCheckSeen[today]) return;
   if(!inst.kursCheckSeen) inst.kursCheckSeen={};
-  inst.kursCheckSeen={[today]:true};                   // nur heutiger Merker, alte verwerfen
+  inst.kursCheckSeen={[today]:true};
   persist();
   renderKursCheck(offen);
-  document.getElementById('kursCheckModal').classList.add('open');
+  const modal=document.getElementById('kursCheckModal');
+  modal.dataset.pflicht=pflicht?'1':'';
+  const x=modal.querySelector('.xcls'); if(x) x.style.display=pflicht?'none':'';
+  const hint=modal.querySelector('.mbdy>div:last-child');
+  if(hint) hint.innerHTML=pflicht
+    ?'<b style="color:#b91c1c">Ab dem 3. Kurstag ist eine Entscheidung erforderlich.</b> Bitte jeden Teilnehmer einordnen – „✓ Ist doch da" bleibt jederzeit möglich, falls er doch am Kurs teilnimmt.'
+    :'Der Hinweis kommt beim Öffnen des Lehrgangs einmal pro Kurstag wieder, solange offene Fälle bestehen.';
+  modal.classList.add('open');
 }
 function renderKursCheck(offen){
   const el=document.getElementById('kursCheckList'); if(!el) return;
   if(!offen||!offen.length){ el.innerHTML='<div style="font-size:.74rem;color:#059669;font-weight:700;padding:8px 0">✓ Alle Teilnehmer eingeordnet.</div>'; return; }
   el.innerHTML=offen.map(o=>{
     const nm=esc(o.name)+(o.company?' <span style="color:var(--mu);font-weight:500">· '+esc(o.company)+'</span>':'')+(o.abgelehnt?' <span style="color:#dc2626;font-weight:800;font-size:.62rem">✗ Kurs abgelehnt</span>':'');
+    if(o.ausPool){
+      const tq=String(o.tnId).replace(/'/g,'');
+      return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--brd);flex-wrap:wrap">'
+        +'<div style="flex:1;min-width:140px;font-size:.78rem;font-weight:700;color:#111">'+nm+' <span style="font-size:.6rem;color:#b45309;font-weight:800">· im Pool, nicht platziert</span></div>'
+        +'<button type="button" onclick="kursCheckPool(\''+tq+'\',\'absent\')" style="padding:5px 9px;font-size:.66rem;font-weight:700;border-radius:7px;border:1px solid #fecaca;background:#fef2f2;color:#991b1b;cursor:pointer">🚫 Nicht angetreten</button>'
+        +'<button type="button" onclick="kursCheckPool(\''+tq+'\',\'wdh\')" style="padding:5px 9px;font-size:.66rem;font-weight:700;border-radius:7px;border:1px solid #fde68a;background:#fffbeb;color:#92400e;cursor:pointer">↩ Wiederholer</button>'
+        +'<button type="button" onclick="closeKursCheck();toast(\'Teilnehmer aus dem Pool auf einen Sitzplatz ziehen\')" style="padding:5px 9px;font-size:.66rem;font-weight:700;border-radius:7px;border:1px solid #a7f3d0;background:#ecfdf5;color:#065f46;cursor:pointer">✓ Ist doch da</button>'
+        +'</div>';
+    }
     const sidQ=o.sid.replace(/'/g,'');
     return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--brd);flex-wrap:wrap">'
       +'<div style="flex:1;min-width:140px;font-size:.78rem;font-weight:700;color:#111">'+nm+'</div>'
@@ -4662,11 +4701,23 @@ function renderKursCheck(offen){
       +'</div>';
   }).join('');
 }
-function closeKursCheck(){ document.getElementById('kursCheckModal').classList.remove('open'); }
+function closeKursCheck(force){
+  const m=document.getElementById('kursCheckModal');
+  if(m.dataset.pflicht==='1' && !force){ toast('Bitte zuerst alle Teilnehmer einordnen – ab dem 3. Kurstag ist das erforderlich','bad'); return; }
+  m.classList.remove('open');
+}
+// v905: Kurs-Check-Aktion fuer einen TN, der noch im Pool liegt (kein Sitzplatz)
+function kursCheckPool(tnId, was){
+  const t=(_poolTNCache||[]).find(x=>x.id===tnId); if(!t) return;
+  const kursId=curInst()?.sharedKursId||'';
+  closeKursCheck(true);
+  if(was==='wdh') _poolEntscheidungWdh(tnId, t.name, kursId);
+  else _poolEntscheidungFehlt(tnId, t.name, kursId);
+}
 function kursCheckAktion(sid, was){
   const inst=curInst(); if(!inst||!inst.seats||!inst.seats[sid]) return;
   const d=inst.seats[sid];
-  closeKursCheck();
+  closeKursCheck(true);
   if(was==='da'){
     // Bestehendes Sitz-Fenster oeffnen: dort Anwesenheit fuer die Tage nachtragen
     toast('Anwesenheit fuer '+d.name+' im Teilnehmer-Fenster nachtragen','ok');
@@ -12684,6 +12735,7 @@ let _meldungenUnsub = null;
 let _meldUnsub = null; // Meldungen listener
 let _checkinUnsub = null; // QR-Anwesenheit Check-in listener
 let _todayCheckinMap = {}; // tnId -> checkin-Doc (heutige QR-Check-ins, für Abgleich auch bei späterer Platzierung)
+let _poolTNCache = [];   // v905: TN des Kurses (auch unplatzierte) fuer den Kurs-Check
 let _tnStatusMap = {}; // tnId -> globalTN.status ('absent'|'wiederholer'|...) aus dem Pool-Snapshot; graut Sitze geraeteuebergreifend aus
 
 // Frischt Beruf/Fachrichtung aller platzierten Sitze aus den globalTN-Stammdaten auf (Liste hat Hoheit).
@@ -13252,7 +13304,9 @@ function loadPool(){
       // Wiederholer wird in der Kurs-Subcollection als eigenes Feld wiederholer:true gefuehrt (status geloescht),
       // Nicht-angetreten als status:'absent' - beides beruecksichtigen.
       _tnStatusMap={};
-      snap.forEach(doc=>{ const dd=doc.data(); if(!dd) return; if(dd.wiederholer===true){ _tnStatusMap[doc.id]='wiederholer'; } else if(dd.status){ _tnStatusMap[doc.id]=dd.status; } });
+      _poolTNCache=[];
+      snap.forEach(doc=>{ const dd=doc.data(); if(!dd) return; if(dd.wiederholer===true){ _tnStatusMap[doc.id]='wiederholer'; } else if(dd.status){ _tnStatusMap[doc.id]=dd.status; }
+        _poolTNCache.push({id:doc.id, name:((dd.vorname||'')+' '+(dd.nachname||'')).trim()||dd.name||'?', firma:dd.firma||'', addedAt:dd.addedAt||0}); });
       // Sitze neu zeichnen, damit Wiederholer/Nicht-angetreten sofort ausgegraut werden (Map ist jetzt aktuell)
       try{ renderSeats(); }catch(e){}
       // Duplikat-Check (manuell angelegt vs. selbst registriert)
@@ -13299,10 +13353,27 @@ function loadPool(){
         if(_kursLaeuftP && !isPlaced && !isPending){
           card.classList.add('pool-card-fehlt');
           card.title='\u26a0 '+fullName+' \u2013 Nicht angetreten? \u2192 In den Container \u201eNicht angetreten\u201c ziehen (Verwaltung wird informiert). Doch da? Auf einen Sitzplatz ziehen.';
+          // v904: sichtbare Klick-Knoepfe statt nur Tooltip+Ziehen (der rote Rahmen bleibt,
+          // keine doppelte Markierung). Erst ab dem 2. Kurstag, damit Tag 1 ruhig bleibt.
+          card.dataset.entscheiden=(_todayP>_instStartP)?'1':'';
         }
         card.innerHTML='<div class="pool-avatar"'+(isPending?' style="background:rgba(239,68,68,.2);color:#ef4444;opacity:.5"':'')+'>'+initials+'</div>'
           +'<div style="flex:1;min-width:0'+(isPending?';opacity:.5':'')+'"><div class="pool-name" title="'+esc(fullName)+(d.firma?' \u2013 '+esc(d.firma):'')+'">'+esc(fullName)+'</div>'
           +'<div class="pool-sub" title="'+esc(fullName+(d.firma?' \u2013 '+d.firma:'')+(d.beruf?' \u00b7 '+d.beruf:''))+'">'+(isPending?'<span style="color:#ef4444;font-weight:700">🔴 Wird entfernt \u2013 dein Klick n\u00f6tig</span>':isUnbestaetigt?'<span style="color:#ef4444;font-weight:700">⚠️ noch nicht bestätigt</span>':isPlaced?'✓ Platziert':urlConf?'<span style="color:#f59e0b;font-weight:700">🏖 '+urlConf.days+'d Urlaub</span>':(d.wunschSitzplatz?'<span style="color:#10b981;font-weight:600">🪑 Platz '+esc(d.wunschSitzplatz)+'</span> · ':'')+esc(d.firma||d.beruf||''))+'</div></div>';
+        if(card.dataset.entscheiden==='1'){
+          const bar=document.createElement('div');
+          bar.style.cssText='display:flex;gap:4px;width:100%;margin-top:6px';
+          const mk=(txt,titel,bg,brd,col,fn)=>{ const b=document.createElement('button');
+            b.textContent=txt; b.title=titel;
+            b.style.cssText='flex:1;padding:4px 6px;font-size:.62rem;font-weight:800;border-radius:5px;cursor:pointer;background:'+bg+';border:1px solid '+brd+';color:'+col;
+            b.onclick=ev=>{ ev.stopPropagation(); fn(); }; return b; };
+          bar.appendChild(mk('\u21a9 Wiederholer','Als Wiederholer einstufen (Grund wird abgefragt)','rgba(217,119,6,.08)','rgba(217,119,6,.4)','#92400e',
+            ()=>_poolEntscheidungWdh(doc.id, fullName, kursId)));
+          bar.appendChild(mk('\ud83d\udeab Nicht angetreten','Als nicht angetreten einstufen (Frist wird abgefragt)','rgba(239,68,68,.08)','rgba(239,68,68,.4)','#991b1b',
+            ()=>_poolEntscheidungFehlt(doc.id, fullName, kursId)));
+          card.appendChild(bar);
+          card.style.flexWrap='wrap';
+        }
         if(isPending){
           // Quittier-Knopf: der TN wurde von der Verwaltung zur Entfernung vorgemerkt
           // (App-Info + Mails sind beim Vormerken schon rausgegangen). Der Ausbilder
@@ -13657,6 +13728,19 @@ function _zeigeEinstufungPflicht(tnName, seatId){
   document.body.appendChild(ov);
 }
 function _einstufungOvSchliessen(){ const ov=document.getElementById('einstufungOv'); if(ov) ov.remove(); }
+// v904: Entscheidung direkt aus dem Pool (ohne Ziehen) - oeffnet dieselben Dialoge
+// wie Drag&Drop, damit Grund/Frist, Mails und Cloud-Schreibweg identisch bleiben.
+function _poolEntscheidungWdh(tnId, tnName, kursId){
+  _wdhPendingData={tnName, tnId, kursId:kursId||curInst()?.sharedKursId||'', fromSeat:false, seatId:null, poolDragId:tnName, seatDragId:null};
+  document.getElementById('wdhGrundName').textContent='\u21a9 '+tnName+' \u2192 Wiederholer';
+  document.getElementById('wdhGrundFreitext').value='';
+  document.getElementById('wdhGrundModal').classList.add('open');
+}
+function _poolEntscheidungFehlt(tnId, tnName, kursId){
+  _poolDragId=tnName; _poolDragTnId=tnId; _poolDragKursId=kursId||curInst()?.sharedKursId||'';
+  _seatDragId=null; _wiederholerSeatId=null; _fehltLocal=false;
+  dropToFehlt({preventDefault(){}});
+}
 function _wiederholerVonSeat(seatId){
   const inst=curInst(); if(!inst) return;
   const d=inst.seats[seatId]; if(!d||!d.name) return;
