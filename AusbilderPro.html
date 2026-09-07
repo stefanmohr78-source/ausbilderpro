@@ -1913,14 +1913,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             <option value="absent_u">❌ Abwesend – Unentschuldigt</option>
             <option value="berufsschule">🏫 Berufsschule</option>
             <option value="early">🚶 Früher gegangen</option>
-            <option value="pause">☕ Zu spät aus Pause</option>
           </select>
-          <div id="pauseSub" style="display:none;margin:4px 0 8px;padding:10px;background:rgba(217,119,6,.06);border:1px solid rgba(217,119,6,.3);border-radius:8px">
-            <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
-              <div class="fg" style="margin:0;flex:1;min-width:120px"><label class="fl">Minuten zu spät (aus der Pause)</label><input class="fi" type="number" id="pauseMin" min="1" max="240" value="10" inputmode="numeric" style="font-family:JetBrains Mono,monospace;font-weight:700"></div>
-            </div>
-            <div style="font-size:.62rem;color:var(--mu);margin-top:6px">Wird auf die Verspätung des Tages <b>draufgerechnet</b> (auch wenn morgens pünktlich). Grund unten bei „Bemerkung".</div>
-          </div>
           <div id="earlySub" style="display:none;margin:4px 0 8px;padding:10px;background:rgba(217,119,6,.06);border:1px solid rgba(217,119,6,.3);border-radius:8px">
             <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
               <div class="fg" style="margin:0;flex:1;min-width:120px"><label class="fl">Gegangen um</label><input class="fi" type="time" id="earlyZeit" oninput="_earlyBerechne()" style="font-family:JetBrains Mono,monospace;font-weight:700"></div>
@@ -2013,7 +2006,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v896';
+const APP_VERSION = 'v897';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2028,6 +2021,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v897', d:'07.09.2026', items:['☕ „Zu spät aus der Pause" sitzt jetzt im ✎-Bearbeiten-Dialog der Anwesenheitshistorie (bei Anwesend-Einträgen): Minuten eintragen → werden beim Speichern auf „Zu spät" draufgerechnet, Notiz vermerkt „Pause +X min". Aus dem Status-Dropdown entfernt']},
   {v:'v896', d:'07.09.2026', items:['☕ „Zu spät aus Pause" ist vom Sitzplan ins Anwesenheits-Dropdown gewandert (neben „Früher gegangen"): Status wählen → Minuten → Grund. Wird auf die Tages-Verspätung draufgerechnet; der P-Knopf auf der Karte entfällt']},
   {v:'v895', d:'06.09.2026', items:['🔄 Beruf/Fachrichtung werden jetzt automatisch aus den Stammdaten auf die Sitzplätze übernommen (wie Name und Firma) – der Knopf „TN-Daten auffrischen" entfällt']},
   {v:'v894', d:'06.09.2026', items:['🎨 Aufgeklappte Gruppen im Aktionen-Menü (Dokumente, QR) sind blau hervorgehoben, solange das Untermenü offen ist']},
@@ -6343,8 +6337,6 @@ function selMain(type){
   // v887: "Frueher gegangen" - Uhrzeit statt Kopfrechnen
   const es=document.getElementById('earlySub'); const noteEl=document.getElementById('aNote');
   if(es){ es.style.display=(type==='early')?'block':'none'; }
-  const ps=document.getElementById('pauseSub'); if(ps){ ps.style.display=(type==='pause')?'block':'none'; }
-  if(type==='pause' && noteEl) noteEl.placeholder='Grund (optional)…';
   if(type==='early'){
     const z=document.getElementById('earlyZeit');
     if(z && !z.value){ const n=new Date(); z.value=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0'); }
@@ -6377,18 +6369,6 @@ function addAtt(){ if(lockGuard())return;
   // Wenn kein Status gewählt: Modal öffnen statt nur Alert
   if(!curAttMain){
     _openAddAttModal(date, note);
-    return;
-  }
-  if(curAttMain==='pause'){
-    const min=parseInt((document.getElementById('pauseMin')||{}).value,10);
-    if(!min||min<=0){ alert('Bitte Minuten eingeben.'); return; }
-    const jetzt=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
-    const alt=tmpAtt.find(a=>a.date===date);
-    if(alt && alt.type!=='present'){ alert('Für diesen Tag ist kein „anwesend" eingetragen – bitte erst Anwesenheit setzen.'); return; }
-    const e3={date,type:'present',note:((alt&&alt.note)?alt.note+' · ':'')+(note?note+' · ':'')+'☕ Pause +'+min+' min ('+jetzt+')',
-      lateMins:((alt&&parseInt(alt.lateMins))||0)+min, earlyMins:(alt&&parseInt(alt.earlyMins))||0, qr:!!(alt&&alt.qr)};
-    _commitAttEntry(e3, true);   // zusammengefuehrt - keine "Ueberschreiben?"-Rueckfrage
-    toast('☕ +'+min+' min – heute gesamt '+e3.lateMins+' min zu spät');
     return;
   }
   if(curAttMain==='early'){
@@ -6561,6 +6541,14 @@ function editAtt(i, ev){
       +'<span style="font-size:.7rem;color:var(--mu)">Minuten</span>'
       +'</div>'
       +'</div>'
+      // v897: Zu spaet aus der Pause - Minuten werden beim Speichern auf "Zu spaet" DRAUFGERECHNET
+      +'<div style="background:rgba(217,119,6,.06);border:1px solid rgba(217,119,6,.3);border-radius:8px;padding:10px;margin-bottom:12px">'
+      +'<div style="font-size:.78rem;font-weight:700;margin-bottom:6px">☕ Zu spät aus der Pause</div>'
+      +'<div style="display:flex;align-items:center;gap:6px">'
+      +'<input type="number" class="fi" id="editPauseMins" value="" placeholder="0" min="0" style="width:80px;font-size:.78rem;padding:6px 8px">'
+      +'<span style="font-size:.7rem;color:var(--mu)">Minuten – werden auf „Zu spät" draufgerechnet</span>'
+      +'</div>'
+      +'</div>'
     ):'')
     +'<label class="fl" style="margin-bottom:6px;display:block">Bemerkung</label>'
     +'<input class="fi" type="text" id="editAttNote" value="'+esc(noteVal).replace(/"/g,'&quot;')+'" placeholder="optional…" style="margin-bottom:14px">'
@@ -6580,19 +6568,23 @@ function closeEditAtt(){
 function saveEditAtt(i){
   const a=tmpAtt[i];
   if(!a){ closeEditAtt(); return; }
+  let pauseMin=0;
   if(a.type==='present'){
     const lc=document.getElementById('editLateChk');
     const ec=document.getElementById('editEarlyChk');
     a.lateMins=(lc&&lc.checked)?(parseInt(document.getElementById('editLateMins').value)||0):0;
     a.earlyMins=(ec&&ec.checked)?(parseInt(document.getElementById('editEarlyMins').value)||0):0;
+    pauseMin=parseInt((document.getElementById('editPauseMins')||{}).value,10)||0;
+    if(pauseMin>0) a.lateMins=(a.lateMins||0)+pauseMin;   // v897: Pause draufrechnen
   }
   const nf=document.getElementById('editAttNote');
   if(nf) a.note=nf.value||'';
+  if(pauseMin>0){ const jetzt=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}); a.note=(a.note?a.note+' · ':'')+'☕ Pause +'+pauseMin+' min ('+jetzt+')'; }
   closeEditAtt();
   renderAtt();
   const saveBtn=document.getElementById('btnSaveAtt');
   if(saveBtn){saveBtn.style.opacity='1';saveBtn.style.pointerEvents='auto';saveBtn.classList.add('btn-blink');}
-  toast('Eintrag aktualisiert','ok');
+  toast(pauseMin>0?('☕ +'+pauseMin+' min – jetzt gesamt '+a.lateMins+' min zu spät'):'Eintrag aktualisiert','ok');
 }
 // Button-Status für weichen No-Show-Pfad (aktiv wenn unentschuldigter Fehltag vorhanden)
 function _updMeldBanner(){
