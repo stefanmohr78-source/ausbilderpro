@@ -2006,7 +2006,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v897';
+const APP_VERSION = 'v898';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2021,6 +2021,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v898', d:'07.09.2026', items:['🐛 Wichtiger Fix: Die Einstufung als Wiederholer aus dem Pool schlug bisher lautlos fehl (fehlende Felder in der Firestore-Regel, jetzt ergänzt) – der TN blieb trotz Bestätigung im Pool sichtbar. Zusätzlich: ein künftiger Speicherfehler wird jetzt sichtbar als Warnung angezeigt statt lautlos verschluckt']},
   {v:'v897', d:'07.09.2026', items:['☕ „Zu spät aus der Pause" sitzt jetzt im ✎-Bearbeiten-Dialog der Anwesenheitshistorie (bei Anwesend-Einträgen): Minuten eintragen → werden beim Speichern auf „Zu spät" draufgerechnet, Notiz vermerkt „Pause +X min". Aus dem Status-Dropdown entfernt']},
   {v:'v896', d:'07.09.2026', items:['☕ „Zu spät aus Pause" ist vom Sitzplan ins Anwesenheits-Dropdown gewandert (neben „Früher gegangen"): Status wählen → Minuten → Grund. Wird auf die Tages-Verspätung draufgerechnet; der P-Knopf auf der Karte entfällt']},
   {v:'v895', d:'06.09.2026', items:['🔄 Beruf/Fachrichtung werden jetzt automatisch aus den Stammdaten auf die Sitzplätze übernommen (wie Name und Firma) – der Knopf „TN-Daten auffrischen" entfällt']},
@@ -13683,7 +13684,8 @@ function _execWdhGrund(p, grund){
     if(_db && p.kursId && p.tnId){
       _db.collection('shared').doc('kurse').collection('list').doc(p.kursId)
         .collection('teilnehmer').doc(p.tnId).update({status:'wiederholer', wdhGrund:grund, wdhTs:Date.now(), wdhVon:_auth?.currentUser?.email||''})
-        .then(()=>loadPool()).catch(()=>loadPool());
+        .then(()=>loadPool())
+        .catch(err=>{ loadPool(); toast('⚠️ Wiederholer-Einstufung NICHT gespeichert (Cloud-Fehler): '+err.message,'bad'); console.error('Wiederholer-Schreibfehler:',err); });
       syncGlobalTNStatus(p.tnId, 'wiederholer');
       _db.collection('globalTN').doc(p.tnId).update({wdhGrund:grund, wdhTs:Date.now()}).catch(()=>{});
     } else { loadPool(); renderWiederholer(null); }
@@ -13701,7 +13703,8 @@ function _execWdhGrund(p, grund){
     if(_db && p.kursId && p.tnId){
       _db.collection('shared').doc('kurse').collection('list').doc(p.kursId)
         .collection('teilnehmer').doc(p.tnId).update({status:'wiederholer', wdhGrund:grund, wdhTs:Date.now(), wdhVon:_auth?.currentUser?.email||''})
-        .then(()=>loadPool()).catch(()=>loadPool());
+        .then(()=>loadPool())
+        .catch(err=>{ loadPool(); toast('⚠️ Wiederholer-Einstufung NICHT gespeichert (Cloud-Fehler): '+err.message,'bad'); console.error('Wiederholer-Schreibfehler:',err); });
       syncGlobalTNStatus(p.tnId, 'wiederholer');
       _db.collection('globalTN').doc(p.tnId).update({wdhGrund:grund, wdhTs:Date.now()}).catch(()=>{});
     } else { loadPool(); }
