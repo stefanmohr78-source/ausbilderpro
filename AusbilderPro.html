@@ -2006,7 +2006,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v895';
+const APP_VERSION = 'v896';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2021,6 +2021,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v896', d:'07.09.2026', items:['🟠 Erinnerungsrahmen (rot/orange) erscheinen nur noch bei ausdrücklich eingetragenem Fehlen (F/E/U/K) – nicht mehr bei ungepflegten Tagen (Urlaub, Berufsschultage) oder „heute noch nichts eingetragen". Nicht-Erschienene ohne Eintrag fängt weiterhin der Kurs-Check am 2. Tag']},
   {v:'v895', d:'06.09.2026', items:['🔄 Beruf/Fachrichtung werden jetzt automatisch aus den Stammdaten auf die Sitzplätze übernommen (wie Name und Firma) – der Knopf „TN-Daten auffrischen" entfällt']},
   {v:'v894', d:'06.09.2026', items:['🎨 Aufgeklappte Gruppen im Aktionen-Menü (Dokumente, QR) sind blau hervorgehoben, solange das Untermenü offen ist']},
   {v:'v893', d:'06.09.2026', items:['🎨 QR-Gruppenknopf im Aktionen-Menü jetzt weiß wie die anderen (kein farbiger Verlauf mehr)']},
@@ -4521,27 +4522,31 @@ function seatAlertInfo(inst,id,d){
     const today=new Date().toISOString().slice(0,10);
     if(today<=start) return null; // am 1. Kurstag selbst noch kein Rahmen
     const att=d.attendance||[];
-    const hasEntry=ds=>!!(((inst.attendance||{})[ds]||{})[id])||att.some(a=>a.date===ds)||(d.qrCheckin&&d.qrCheckin.datum===ds);
-    const isAbsent=ds=>att.some(a=>a.date===ds&&(a.type==='absent_e'||a.type==='absent_u'||a.type==='sick'));
+    // v896: NUR ausdruecklich eingetragenes Fehlen zaehlt (Raster F/E/U/K oder Detail
+    // entschuldigt/unentschuldigt/krank). Leere Tage (Urlaub des Ausbilders, nicht gepflegte
+    // Berufsschultage) und "heute noch nichts eingetragen" loesen KEINEN Rahmen mehr aus.
+    // Echte Nicht-Erschienene ohne jeden Eintrag faengt der Kurs-Check-Dialog am 2. Tag.
+    const isAbsent=ds=>{
+      const code=((inst.attendance||{})[ds]||{})[id];
+      if(code==='F'||code==='E'||code==='U'||code==='K') return true;
+      return att.some(a=>a.date===ds&&(a.type==='absent_e'||a.type==='absent_u'||a.type==='sick'));
+    };
     const dism=d.alertDismiss||{};
-    // ROT: Tag 1 ohne jeglichen Eintrag
-    if(!hasEntry(start)) return dism[start]?null:{kind:'fehlt',key:start};
-    // Fehltage: vergangene Kurstage (Mo–Fr) von Start bis gestern
+    // ROT: Tag 1 ausdruecklich als fehlend eingetragen
+    if(isAbsent(start)) return dism[start]?null:{kind:'fehlt',key:start};
+    // Fehltage: vergangene Kurstage (Mo–Fr) von Start bis heute, nur eingetragene
     const missed=[];
     const dt=new Date(start+'T12:00:00');
     for(let g=0;g<400;g++){
       const ds=dt.toISOString().slice(0,10);
-      if(ds>=today||ds>end) break;
+      if(ds>today||ds>end) break;
       const wd=dt.getDay();
-      if(wd!==0&&wd!==6&&(!hasEntry(ds)||isAbsent(ds))) missed.push(ds);
+      if(wd!==0&&wd!==6&&isAbsent(ds)) missed.push(ds);
       dt.setDate(dt.getDate()+1);
     }
-    // Droht heute der nächste Fehltag? (Kurstag, ab 7:30, noch kein Eintrag/Check-in)
-    const now=new Date();
-    const lateNow=(today<=end)&&now.getDay()!==0&&now.getDay()!==6&&(now.getHours()*60+now.getMinutes())>=_instBeginnMins(inst)&&!hasEntry(today);
-    const cnt=missed.length+(lateNow?1:0);
+    const cnt=missed.length;
     if(cnt<2) return null; // 1 Fehltag ist ok – erst ab dem 2. wird erinnert
-    const key=missed.concat(lateNow?[today]:[]).join(',');
+    const key=missed.join(',');
     return dism[key]?null:{kind:'wdh',key:key,count:cnt};
   }catch(e){ return null; }
 }
