@@ -2010,7 +2010,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v902';
+const APP_VERSION = 'v903';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2025,6 +2025,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v903', d:'07.09.2026', items:['⚠️ „Alle anwesend" fragt jetzt mit Klartext nach: zeigt vorab die Namen der Teilnehmer, die dadurch neu auf anwesend gesetzt würden, nennt die Anzahl bereits eingecheckter und warnt, dass der Knopf zum Nachtragen leerer Tage gedacht ist – nicht zum morgendlichen Vorab-Eintragen']},
   {v:'v902', d:'07.09.2026', items:['🔎 Live-Sync-Einträge zeigen jetzt ihre Herkunft: statt „per Live-Sync" steht z.B. „✓ von Hand – s.mohr (Handy)". So ist sofort erkennbar, von welchem Gerät ein Anwesend-Eintrag kam, der nicht per QR entstanden ist']},
   {v:'v901', d:'07.09.2026', items:['✨ Zugeklappte Kurse in der Kursliste blinken sanft grün und bekommen einen Punkt, wenn darin gerade ein Lehrgang läuft – auch in der Mobil-Ansicht']},
   {v:'v900', d:'07.09.2026', items:['🐛 Fix: „Mögliche Dublette"-Warnung beim Lehrgänge abrufen verglich Zeiträume nie richtig (falsche Feldnamen bei selbst angelegten Kursen) und warnte dadurch bei jedem Namens-Treffer, auch bei komplett unterschiedlichen Terminen. Vergleicht jetzt die echten Start-/Enddaten']},
@@ -4962,7 +4963,19 @@ async function refreshAllSeatNamesFromGlobalTN(){
 function markAlleAnwesend(){ if(lockGuard())return;
   const inst=curInst(); if(!inst) return;
   const today=new Date().toISOString().slice(0,10);
-  if(!confirm('✓ Alle Schüler für heute als anwesend markieren?\n\nDatum: '+new Date(today).toLocaleDateString('de-DE')+'\n\nHinweis: Schüler die heute schon einen anderen Status haben (Berufsschule, Krank, ...) werden NICHT überschrieben.')) return;
+  // v903: Vorab zeigen, WEN es betrifft. "Alle anwesend" ist zum Nachtragen leerer Tage
+  // gedacht - wird es morgens gedrueckt, werden auch TN gruen, die gar nicht da sind.
+  // Deshalb Klartext: wie viele haben schon eingecheckt, wie viele wuerden jetzt neu
+  // auf anwesend gesetzt (mit Namen, damit der Fehlgriff sofort auffaellt).
+  const offen=[]; let schon=0;
+  getRows(inst).forEach(r=>r.seats.forEach(sid=>{
+    const d=inst.seats[sid]; if(!d||!d.name) return;
+    if((d.attendance||[]).some(a=>a.date===today)) schon++; else offen.push(d.name);
+  }));
+  if(!offen.length){ toast('Für heute haben bereits alle einen Status – nichts zu tun'); return; }
+  const liste=offen.slice(0,12).join(', ')+(offen.length>12?' … (+'+(offen.length-12)+')':'');
+  const warn=schon?('\n\n'+schon+' Teilnehmer haben heute bereits eingecheckt – die bleiben unverändert.'):'';
+  if(!confirm('✓ '+offen.length+' Teilnehmer OHNE Eintrag für heute als ANWESEND markieren?\n\nDatum: '+new Date(today).toLocaleDateString('de-DE')+'\n\nBetroffen:\n'+liste+warn+'\n\n⚠️ Nur bestätigen, wenn diese Teilnehmer wirklich anwesend sind. Zum Nachtragen leerer Tage gedacht – nicht zum morgendlichen Vorab-Eintragen.')) return;
   let count=0, skipped=0;
   const rows=getRows(inst);
   rows.forEach(r=>{
