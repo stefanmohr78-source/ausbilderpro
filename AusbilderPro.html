@@ -1913,7 +1913,14 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             <option value="absent_u">❌ Abwesend – Unentschuldigt</option>
             <option value="berufsschule">🏫 Berufsschule</option>
             <option value="early">🚶 Früher gegangen</option>
+            <option value="pause">☕ Zu spät aus Pause</option>
           </select>
+          <div id="pauseSub" style="display:none;margin:4px 0 8px;padding:10px;background:rgba(217,119,6,.06);border:1px solid rgba(217,119,6,.3);border-radius:8px">
+            <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+              <div class="fg" style="margin:0;flex:1;min-width:120px"><label class="fl">Minuten zu spät (aus der Pause)</label><input class="fi" type="number" id="pauseMin" min="1" max="240" value="10" inputmode="numeric" style="font-family:JetBrains Mono,monospace;font-weight:700"></div>
+            </div>
+            <div style="font-size:.62rem;color:var(--mu);margin-top:6px">Wird auf die Verspätung des Tages <b>draufgerechnet</b> (auch wenn morgens pünktlich). Grund unten bei „Bemerkung".</div>
+          </div>
           <div id="earlySub" style="display:none;margin:4px 0 8px;padding:10px;background:rgba(217,119,6,.06);border:1px solid rgba(217,119,6,.3);border-radius:8px">
             <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
               <div class="fg" style="margin:0;flex:1;min-width:120px"><label class="fl">Gegangen um</label><input class="fi" type="time" id="earlyZeit" oninput="_earlyBerechne()" style="font-family:JetBrains Mono,monospace;font-weight:700"></div>
@@ -2006,7 +2013,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v895';
+const APP_VERSION = 'v896';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2021,6 +2028,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v896', d:'07.09.2026', items:['☕ „Zu spät aus Pause" ist vom Sitzplan ins Anwesenheits-Dropdown gewandert (neben „Früher gegangen"): Status wählen → Minuten → Grund. Wird auf die Tages-Verspätung draufgerechnet; der P-Knopf auf der Karte entfällt']},
   {v:'v895', d:'06.09.2026', items:['🔄 Beruf/Fachrichtung werden jetzt automatisch aus den Stammdaten auf die Sitzplätze übernommen (wie Name und Firma) – der Knopf „TN-Daten auffrischen" entfällt']},
   {v:'v894', d:'06.09.2026', items:['🎨 Aufgeklappte Gruppen im Aktionen-Menü (Dokumente, QR) sind blau hervorgehoben, solange das Untermenü offen ist']},
   {v:'v893', d:'06.09.2026', items:['🎨 QR-Gruppenknopf im Aktionen-Menü jetzt weiß wie die anderen (kein farbiger Verlauf mehr)']},
@@ -5237,9 +5245,7 @@ function mkSeat(id,seats){
     const _qaN=new Date();
     const qaLate=_qaN.getDay()!==0&&_qaN.getDay()!==6&&(_qaN.getHours()*60+_qaN.getMinutes())>=_instBeginnMins(inst);
     const qaBtn=(qaSt||hasDetail||qaD>instEnd||qaD<instStart)?'':'<div class="sqa-btn'+(qaLate?' sqa-late':'')+'" onclick="event.stopPropagation();seatQuickAtt(\''+id+'\')" title="'+(qaLate?'Bis '+_instBeginn(inst)+' nicht erschienen – Klick trägt trotzdem Anwesend ein':'Anwesend markieren')+'">✓</div>';
-    // v882: ☕ Pause-Verspaetung - nur wenn heute anwesend (Gegenstueck zum ✓-Knopf)
-    const _heutePraesent=(qaSt==='P')||att.some(a=>a&&a.date===qaD&&a.type==='present');
-    const pauseBtn=(_heutePraesent&&qaD<=instEnd&&qaD>=instStart&&!isPending)?'<div class="sqa-btn sqa-pause" onclick="event.stopPropagation();seatPauseVerspaetung(\''+id+'\')" title="Zu spät aus der Pause – Minuten auf die Tages-Verspätung draufrechnen">P</div>':'';
+    const pauseBtn=''; // v896: Pause-Verspaetung jetzt im Anwesenheits-Dropdown statt auf der Karte
     // Erinnerungs-Rahmen (Tag-1-No-Show rot / ab 2. Fehltag amber)
     const seatAlert=seatAlertInfo(inst,id,d);
     let alertX='';
@@ -6337,6 +6343,8 @@ function selMain(type){
   // v887: "Frueher gegangen" - Uhrzeit statt Kopfrechnen
   const es=document.getElementById('earlySub'); const noteEl=document.getElementById('aNote');
   if(es){ es.style.display=(type==='early')?'block':'none'; }
+  const ps=document.getElementById('pauseSub'); if(ps){ ps.style.display=(type==='pause')?'block':'none'; }
+  if(type==='pause' && noteEl) noteEl.placeholder='Grund (optional)…';
   if(type==='early'){
     const z=document.getElementById('earlyZeit');
     if(z && !z.value){ const n=new Date(); z.value=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0'); }
@@ -6371,6 +6379,18 @@ function addAtt(){ if(lockGuard())return;
     _openAddAttModal(date, note);
     return;
   }
+  if(curAttMain==='pause'){
+    const min=parseInt((document.getElementById('pauseMin')||{}).value,10);
+    if(!min||min<=0){ alert('Bitte Minuten eingeben.'); return; }
+    const jetzt=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+    const alt=tmpAtt.find(a=>a.date===date);
+    if(alt && alt.type!=='present'){ alert('Für diesen Tag ist kein „anwesend" eingetragen – bitte erst Anwesenheit setzen.'); return; }
+    const e3={date,type:'present',note:((alt&&alt.note)?alt.note+' · ':'')+(note?note+' · ':'')+'☕ Pause +'+min+' min ('+jetzt+')',
+      lateMins:((alt&&parseInt(alt.lateMins))||0)+min, earlyMins:(alt&&parseInt(alt.earlyMins))||0, qr:!!(alt&&alt.qr)};
+    _commitAttEntry(e3, true);   // zusammengefuehrt - keine "Ueberschreiben?"-Rueckfrage
+    toast('☕ +'+min+' min – heute gesamt '+e3.lateMins+' min zu spät');
+    return;
+  }
   if(curAttMain==='early'){
     const z=(document.getElementById('earlyZeit')||{}).value||'';
     const min=_earlyMinsAus(z);
@@ -6390,10 +6410,10 @@ function addAtt(){ if(lockGuard())return;
 }
 
 // Eintrag zur Liste hinzufügen + Speichern-Button aktivieren (gemeinsame Logik für Hauptformular und Modal)
-function _commitAttEntry(entry){
+function _commitAttEntry(entry, ohneRueckfrage){
   const existIdx=tmpAtt.findIndex(a=>a.date===entry.date);
   if(existIdx>=0){
-    if(!confirm('Für den '+fmtD(entry.date)+' existiert bereits ein Eintrag ('+attCfg(tmpAtt[existIdx]).label+').\n\nÜberschreiben?')) return false;
+    if(!ohneRueckfrage && !confirm('Für den '+fmtD(entry.date)+' existiert bereits ein Eintrag ('+attCfg(tmpAtt[existIdx]).label+').\n\nÜberschreiben?')) return false;
     tmpAtt[existIdx]=entry;
   } else {
     tmpAtt.push(entry);
