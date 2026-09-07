@@ -150,6 +150,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .kat-row.hbz-drop-target{background:rgba(59,130,246,.12)!important;border-radius:7px;outline:2px dashed var(--acc);outline-offset:-2px;}
 .hbz-divider{height:1px;background:linear-gradient(90deg,transparent,#e2e8f0,transparent);margin:6px 12px;flex-shrink:0;}
 .kat-row{display:flex;align-items:center;padding:8px 10px 8px 11px;cursor:pointer;transition:background .12s;flex-shrink:0;border-radius:8px;margin:2px 6px;border-top:1.5px solid #94a3b8;border-right:1.5px solid #94a3b8;}
+/* v901: zugeklappter Kurs mit aktuell laufendem Lehrgang pulsiert sanft gruen */
+@keyframes katAktivPuls{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}50%{box-shadow:0 0 0 3px rgba(34,197,94,.38)}}
+.kat-row.hat-aktuellen{animation:katAktivPuls 1.8s ease-in-out infinite}
+.kat-row.hat-aktuellen .kat-lbl::after{content:' ●';color:#22c55e;font-size:.85em}
 .kat-row:hover{background:#e2e8f0;}
 .kat-drag{font-size:.85rem;color:transparent;cursor:grab;padding:2px 5px 2px 0;flex-shrink:0;transition:color .12s;line-height:1;}
 .kat-row:hover .kat-drag{color:var(--mu);}
@@ -2006,7 +2010,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v900';
+const APP_VERSION = 'v901';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2021,6 +2025,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v901', d:'07.09.2026', items:['✨ Zugeklappte Kurse in der Kursliste blinken sanft grün und bekommen einen Punkt, wenn darin gerade ein Lehrgang läuft – auch in der Mobil-Ansicht']},
   {v:'v900', d:'07.09.2026', items:['🐛 Fix: „Mögliche Dublette"-Warnung beim Lehrgänge abrufen verglich Zeiträume nie richtig (falsche Feldnamen bei selbst angelegten Kursen) und warnte dadurch bei jedem Namens-Treffer, auch bei komplett unterschiedlichen Terminen. Vergleicht jetzt die echten Start-/Enddaten']},
   {v:'v899', d:'07.09.2026', items:['📧 Bestätigungsdialoge (Wiederholer, „Wegen Fehlen informieren") zeigen jetzt, ob für den Betrieb überhaupt eine E-Mail hinterlegt ist – sonst geht trotz „Betrieb wird informiert" keine Mail raus, das war bisher nicht ersichtlich']},
   {v:'v898', d:'07.09.2026', items:['🐛 Wichtiger Fix: Die Einstufung als Wiederholer aus dem Pool schlug bisher lautlos fehl (fehlende Felder in der Firestore-Regel, jetzt ergänzt) – der TN blieb trotz Bestätigung im Pool sichtbar. Zusätzlich: ein künftiger Speicherfehler wird jetzt sichtbar als Warnung angezeigt statt lautlos verschluckt']},
@@ -2596,7 +2601,15 @@ function renderSidebar(){
 
     // kat row
     const row=document.createElement('div');
-    row.className='kat-row'+(k.open?' open':'');
+    // v901: Laeuft in diesem (zugeklappten) Kurs gerade ein Lehrgang?
+    const _heute=new Date().toISOString().slice(0,10);
+    const _hatAktuellen=Object.values(k.instances||{}).some(i=>{
+      if(!i||!i.sY) return false;
+      const a=i.sY+'-'+String(i.sM||1).padStart(2,'0')+'-'+String(i.sD||1).padStart(2,'0');
+      const b=(i.eY||i.sY)+'-'+String(i.eM||12).padStart(2,'0')+'-'+String(i.eD||28).padStart(2,'0');
+      return a<=_heute && b>=_heute;
+    });
+    row.className='kat-row'+(k.open?' open':'')+((_hatAktuellen&&!k.open)?' hat-aktuellen':'');
     row.dataset.katId=id;
     row.style.borderLeft='3px solid '+katCol;
     row.style.background=katCol+(k.open?'33':'1f');
@@ -11816,7 +11829,15 @@ function renderMobKatList(){
     const total=Object.values(k.instances||{}).reduce((s,inst)=>s+Object.values(inst.seats||{}).filter(d=>d&&d.name).length,0);
     const katCol=_katColors[_mobIdx%_katColors.length];_mobIdx++;
     const row=document.createElement('div');
-    row.className='kat-row'+(k.open?' open':'');
+    // v901: Laeuft in diesem (zugeklappten) Kurs gerade ein Lehrgang?
+    const _heute=new Date().toISOString().slice(0,10);
+    const _hatAktuellen=Object.values(k.instances||{}).some(i=>{
+      if(!i||!i.sY) return false;
+      const a=i.sY+'-'+String(i.sM||1).padStart(2,'0')+'-'+String(i.sD||1).padStart(2,'0');
+      const b=(i.eY||i.sY)+'-'+String(i.eM||12).padStart(2,'0')+'-'+String(i.eD||28).padStart(2,'0');
+      return a<=_heute && b>=_heute;
+    });
+    row.className='kat-row'+(k.open?' open':'')+((_hatAktuellen&&!k.open)?' hat-aktuellen':'');
     row.style.borderLeft='3px solid '+katCol;
     row.style.background=katCol+(k.open?'33':'1f');
     row.style.borderRadius='6px';
