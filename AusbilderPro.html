@@ -2010,7 +2010,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v901';
+const APP_VERSION = 'v902';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2025,6 +2025,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v902', d:'07.09.2026', items:['🔎 Live-Sync-Einträge zeigen jetzt ihre Herkunft: statt „per Live-Sync" steht z.B. „✓ von Hand – s.mohr (Handy)". So ist sofort erkennbar, von welchem Gerät ein Anwesend-Eintrag kam, der nicht per QR entstanden ist']},
   {v:'v901', d:'07.09.2026', items:['✨ Zugeklappte Kurse in der Kursliste blinken sanft grün und bekommen einen Punkt, wenn darin gerade ein Lehrgang läuft – auch in der Mobil-Ansicht']},
   {v:'v900', d:'07.09.2026', items:['🐛 Fix: „Mögliche Dublette"-Warnung beim Lehrgänge abrufen verglich Zeiträume nie richtig (falsche Feldnamen bei selbst angelegten Kursen) und warnte dadurch bei jedem Namens-Treffer, auch bei komplett unterschiedlichen Terminen. Vergleicht jetzt die echten Start-/Enddaten']},
   {v:'v899', d:'07.09.2026', items:['📧 Bestätigungsdialoge (Wiederholer, „Wegen Fehlen informieren") zeigen jetzt, ob für den Betrieb überhaupt eine E-Mail hinterlegt ist – sonst geht trotz „Betrieb wird informiert" keine Mail raus, das war bisher nicht ersichtlich']},
@@ -14838,6 +14839,17 @@ function _liveSitzSnapshot(inst){
   const rows=(inst.rows||[]).map(r=>({id:r.id||('r'+Date.now()+Math.random().toString(36).slice(2,6)),label:r.label||'',seats:(r.seats||[]).slice()}));
   return {rows,belegung};
 }
+// v902: Herkunft eines Live-Eintrags - Kurzname des Kontos + Geraetetyp. Damit steht beim
+// Empfaenger nicht mehr das nichtssagende "per Live-Sync", sondern z.B. "von n.hoehler (Handy)".
+// Wird bewusst NICHT in den Echo-Vergleich einbezogen (siehe _canon-Aufrufe unten), sonst
+// wuerde jedes Geraet den Eintrag staendig neu schreiben.
+function _liveHerkunft(){
+  try{
+    const mail=((_auth&&_auth.currentUser&&_auth.currentUser.email)||'').split('@')[0]||'?';
+    const mob=/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+    return mail+(mob?' (Handy)':' (PC)');
+  }catch(e){ return '?'; }
+}
 function _liveAnwSnapshot(inst){
   // v856: volles Objekt je TN/Tag - Rastercode UND Detail (Typ, Verspaetung, frueher, Notiz).
   // "Zu spaet" lebt nur im Detail (type present + lateMins) und muss mitreisen.
@@ -14847,7 +14859,7 @@ function _liveAnwSnapshot(inst){
     Object.entries(slots||{}).forEach(([sid,code])=>{
       const d=(inst.seats||{})[sid];
       if(!d||!d.name||!code) return;
-      put(datum, d.poolTnId||('sid_'+sid), {c:code});
+      put(datum, d.poolTnId||('sid_'+sid), {c:code, q:_liveHerkunft()});
     });
   });
   Object.entries(inst.seats||{}).forEach(([sid,d])=>{
@@ -14855,7 +14867,7 @@ function _liveAnwSnapshot(inst){
     const key=d.poolTnId||('sid_'+sid);
     (d.attendance||[]).forEach(e=>{
       if(!e||!e.date||!e.type) return;
-      put(e.date, key, {t:e.type, lm:parseInt(e.lateMins)||0, em:parseInt(e.earlyMins)||0, n:e.note||''});
+      put(e.date, key, {t:e.type, lm:parseInt(e.lateMins)||0, em:parseInt(e.earlyMins)||0, n:e.note||'', q:_liveHerkunft()});
     });
   });
   return out;
@@ -15112,7 +15124,8 @@ function _liveApplyDocs(inst, docs, initial){
         const idx=d.attendance.findIndex(e=>e&&e.date===datum);
         const sollTyp=v.t||(v.c==='P'?'present':null);
         if(sollTyp){
-          const soll={date:datum,type:sollTyp,lateMins:v.lm||0,earlyMins:v.em||0,note:v.n||((idx<0)?'per Live-Sync':(d.attendance[idx].note||''))};
+          const _fallback=v.q?('✓ von Hand – '+v.q):'per Live-Sync';
+          const soll={date:datum,type:sollTyp,lateMins:v.lm||0,earlyMins:v.em||0,note:v.n||((idx<0)?_fallback:(d.attendance[idx].note||''))};
           if(idx<0){ d.attendance.push(soll); changed=true; }
           else{
             const e=d.attendance[idx];
@@ -15165,7 +15178,8 @@ function _liveDiffPush(){
     tage.forEach(datum=>{
       const neu=anw[datum]||{}, alt=_live.shadow.anw[datum]||{};
       const upd={}; let dirty=false;
-      Object.entries(neu).forEach(([key,val])=>{ if(_canon(alt[key]===undefined?null:alt[key])!==_canon(val)){ upd['eintraege.'+key]=val; dirty=true; } });
+      const _ohneQ=v=>{ if(!v||typeof v!=='object') return v; const c=Object.assign({},v); delete c.q; return c; };
+      Object.entries(neu).forEach(([key,val])=>{ if(_canon(_ohneQ(alt[key]===undefined?null:alt[key]))!==_canon(_ohneQ(val))){ upd['eintraege.'+key]=val; dirty=true; } });
       Object.keys(alt).forEach(key=>{ if(neu[key]===undefined){ upd['eintraege.'+key]=firebase.firestore.FieldValue.delete(); dirty=true; } });
       if(!dirty) return;
       upd.ts=Date.now();
