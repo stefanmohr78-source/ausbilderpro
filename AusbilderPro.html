@@ -2006,7 +2006,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v898';
+const APP_VERSION = 'v899';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2021,6 +2021,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v899', d:'07.09.2026', items:['📧 Bestätigungsdialoge (Wiederholer, „Wegen Fehlen informieren") zeigen jetzt, ob für den Betrieb überhaupt eine E-Mail hinterlegt ist – sonst geht trotz „Betrieb wird informiert" keine Mail raus, das war bisher nicht ersichtlich']},
   {v:'v898', d:'07.09.2026', items:['🐛 Wichtiger Fix: Die Einstufung als Wiederholer aus dem Pool schlug bisher lautlos fehl (fehlende Felder in der Firestore-Regel, jetzt ergänzt) – der TN blieb trotz Bestätigung im Pool sichtbar. Zusätzlich: ein künftiger Speicherfehler wird jetzt sichtbar als Warnung angezeigt statt lautlos verschluckt']},
   {v:'v897', d:'07.09.2026', items:['☕ „Zu spät aus der Pause" sitzt jetzt im ✎-Bearbeiten-Dialog der Anwesenheitshistorie (bei Anwesend-Einträgen): Minuten eintragen → werden beim Speichern auf „Zu spät" draufgerechnet, Notiz vermerkt „Pause +X min". Aus dem Status-Dropdown entfernt']},
   {v:'v896', d:'07.09.2026', items:['☕ „Zu spät aus Pause" ist vom Sitzplan ins Anwesenheits-Dropdown gewandert (neben „Früher gegangen"): Status wählen → Minuten → Grund. Wird auf die Tages-Verspätung draufgerechnet; der P-Knopf auf der Karte entfällt']},
@@ -6633,7 +6634,11 @@ function notifyUnexcusedAbsence(){
   if(!_nd){ const t=new Date(); _nd=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0'); }
   const datumDE=fmtD(_nd);
   if(!_db||!poolTnId){ toast('TN ist nicht mit der Cloud verknüpft – Mail nicht möglich','bad'); return; }
-  if(!confirm('📣 Azubi (und Betrieb) informieren, dass er am '+datumDE+' (noch) nicht erschienen ist?\n\nEs wird KEIN Fehltag eingetragen – falls er nicht kommt, kannst du ihn danach separat als „Unentsch." eintragen.')) return;
+  // v899: Hinweis, ob eine Arbeitgeber-Mail hinterlegt ist - sonst geht trotz "und Betrieb" keine raus
+  const _ag=(seat.agEmail||'').trim();
+  const _agZeile=_ag?('\n\n✅ Arbeitgeber-Mail hinterlegt ('+_ag+') – Betrieb wird informiert.')
+                     :('\n\n⚠️ Keine Arbeitgeber-Mail hinterlegt – der Betrieb wird NICHT per Mail informiert.');
+  if(!confirm('📣 Azubi (und Betrieb) informieren, dass er am '+datumDE+' (noch) nicht erschienen ist?\n\nEs wird KEIN Fehltag eingetragen – falls er nicht kommt, kannst du ihn danach separat als „Unentsch." eintragen.'+_agZeile)) return;
   const kursName=S.kats[S.curKat]?.label||'Lehrgang';
   const kursNameMail=katLabelFull(S.curKat)||kursName;
   const ausName=getAusbilderProfil().name||_auth?.currentUser?.email?.split('@')[0]||'Ausbilder';
@@ -13668,9 +13673,23 @@ function selectWdhGrund(grund){
   const p=_wdhPendingData;
   _wdhPendingData=null;
 
+  // v899: Hinweis, ob eine Arbeitgeber-Mail ueberhaupt hinterlegt ist - sonst geht trotz
+  // "Betrieb wird informiert" keine Mail raus. agEmail ist ein reines Sitzplatz-Feld
+  // (nicht synchronisiert), daher nur bekannt, wenn der TN schon einmal platziert war.
+  let agHinweis;
+  if(p.fromSeat){
+    const inst=curInst(); const d=inst&&inst.seats[p.seatId];
+    const ag=(d&&d.agEmail||'').trim();
+    agHinweis = ag ? '✅ Arbeitgeber-Mail hinterlegt ('+esc(ag)+') – Betrieb wird informiert.'
+                    : '⚠️ Keine Arbeitgeber-Mail hinterlegt – der Betrieb wird NICHT per Mail informiert.';
+  } else {
+    agHinweis = 'ℹ️ Arbeitgeber-Mail nicht bekannt (TN war noch nicht auf einem Sitzplatz) – ggf. den Betrieb selbst informieren.';
+  }
+
   safeConfirm(
     '↩ Wiederholer',
-    '<b>'+esc(p.tnName)+'</b> als Wiederholer einstufen?<br><br><span style="font-size:.72rem;color:#6B7280">Grund: '+esc(grund)+'<br><br>Der Azubi wird benachrichtigt und der Kurs wird für ihn beendet. <b>Diese Aktion kann nicht rückgängig gemacht werden.</b></span>',
+    '<b>'+esc(p.tnName)+'</b> als Wiederholer einstufen?<br><br><span style="font-size:.72rem;color:#6B7280">Grund: '+esc(grund)+'<br><br>Der Azubi wird benachrichtigt und der Kurs wird für ihn beendet. <b>Diese Aktion kann nicht rückgängig gemacht werden.</b></span>'
+      +'<div style="margin-top:8px;font-size:.68rem;padding:7px 9px;border-radius:6px;background:rgba(217,119,6,.08);color:#92400e">'+agHinweis+'</div>',
     'Ich bestätige die Einstufung als Wiederholer',
     '↩ Wiederholer einstufen',
     ()=>{ _execWdhGrund(p, grund); }
