@@ -2010,7 +2010,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v908';
+const APP_VERSION = 'v909';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2025,6 +2025,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v909', d:'08.09.2026', items:['📊 Korrektur zu v906: Die Anwesenheitsquote rechnet wieder gegen die eingetragenen Kurstage (die geänderte Bezugsgröße erzeugte krumme Prozentwerte). Die 100%-Deckelung bleibt; Verspätungen zählen weiterhin als voller Anwesenheitstag']},
   {v:'v908', d:'08.09.2026', items:['🖨 Anwesenheitsliste jetzt durchgehend alphabetisch nach Nachname sortiert (statt nach Sitzplan-Reihenfolge)']},
   {v:'v907', d:'08.09.2026', items:['🖨 Anwesenheitsliste enthält jetzt auch Teilnehmer, die dem Kurs zugewiesen sind, aber noch keinen Sitzplatz haben – die Liste lässt sich damit schon vor der Sitzverteilung drucken (Häkchen bei ihnen leer und ausfüllbar)']},
   {v:'v906', d:'08.09.2026', items:['📊 Anwesenheitsquote kann nicht mehr über 100% steigen: Bezugsgröße ist jetzt die größere von „eingetragene Kurstage" und „tatsächlich erfasste Tage" (ein Kurs mit 6 Werktagen bei 5 eingetragenen Kurstagen ergab 120%), zusätzlich hart auf 100% begrenzt']},
@@ -5133,10 +5134,10 @@ function syncMobileAttToFirestore(sid){
   const total=present+absentE+absentU+sick+berufsschule;
   if(!total) return;
   const kurstage=inst.kurstage||5;
-  // v906: Bezugsgroesse ist die groessere von "eingetragene Kurstage" und "tatsaechlich
-  // erfasste Tage" - sonst ergibt ein Kurs mit 6 Werktagen, aber 5 eingetragenen Kurstagen,
-  // 120%. Zusaetzlich hart auf 100% gedeckelt: mehr als vollstaendig anwesend gibt es nicht.
-  const effektiveTage=Math.max(kurstage, total);
+  // v909: Bezugsgroesse sind die eingetragenen KURSTAGE (zurueckgenommen: max(kurstage,total)
+  // erzeugte krumme Werte, sobald ein Tag zu viel erfasst war). Nur die 100%-Deckelung bleibt.
+  // Verspaetungen zaehlen bewusst NICHT gegen die Quote - ein verspaeteter Tag ist anwesend.
+  const effektiveTage=kurstage;
   const attPercent=Math.min(100, Math.round((present/effektiveTage)*100));
   // Verspaetungs-Details je Kurstag mitspeichern, damit VerwaltungPro die Auflistung spiegeln kann
   const _bsSync=_bsDates(inst, seatAtt);
@@ -7207,9 +7208,8 @@ function syncAttendanceToFirestore(seatId){
   if(!total&&!hasGrades&&!hasWz) return;
   // Kurstage aus Instanz (default 5)
   const kurstage=inst.kurstage||5;
-  // v906: siehe oben - Bezug auf die tatsaechlich erfassten Tage, hart auf 100% gedeckelt
-  const _bezugTage=Math.max(kurstage, total);
-  const attPercent=_bezugTage>0?Math.min(100, Math.round((present/_bezugTage)*100)):0;
+  // v909: siehe oben - Bezug sind die Kurstage, nur die 100%-Deckelung bleibt
+  const attPercent=kurstage>0?Math.min(100, Math.round((present/kurstage)*100)):0;
   // Custom-Grade Labels werden NICHT pro TN gespeichert sondern zentral am Kurs-Doc
   // (siehe syncCustomGradesToCloud). Hier nur die Werte, nicht die Labels - damit
   // Firestore-Rules-Whitelist eingehalten wird (noten_extra_labels ist nicht erlaubt).
