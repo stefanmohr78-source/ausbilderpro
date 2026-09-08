@@ -2010,7 +2010,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v906';
+const APP_VERSION = 'v908';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2025,6 +2025,8 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v908', d:'08.09.2026', items:['🖨 Anwesenheitsliste jetzt durchgehend alphabetisch nach Nachname sortiert (statt nach Sitzplan-Reihenfolge)']},
+  {v:'v907', d:'08.09.2026', items:['🖨 Anwesenheitsliste enthält jetzt auch Teilnehmer, die dem Kurs zugewiesen sind, aber noch keinen Sitzplatz haben – die Liste lässt sich damit schon vor der Sitzverteilung drucken (Häkchen bei ihnen leer und ausfüllbar)']},
   {v:'v906', d:'08.09.2026', items:['📊 Anwesenheitsquote kann nicht mehr über 100% steigen: Bezugsgröße ist jetzt die größere von „eingetragene Kurstage" und „tatsächlich erfasste Tage" (ein Kurs mit 6 Werktagen bei 5 eingetragenen Kurstagen ergab 120%), zusätzlich hart auf 100% begrenzt']},
   {v:'v905', d:'07.09.2026', items:['⛔ Kurs-Check ab dem 3. Kurstag verbindlich: Teilnehmer ohne jede Einordnung – auch solche, die nur im Pool liegen – müssen als „Wiederholer" oder „Nicht angetreten" eingestuft werden; „✓ Ist doch da" bleibt immer möglich. Nachträglich zugewiesene Teilnehmer lösen den Zwang nicht aus']},
   {v:'v904', d:'07.09.2026', items:['👉 Unplatzierte Teilnehmer im Pool bekommen ab dem 2. Kurstag zwei Knöpfe direkt auf der Karte: „Wiederholer" und „Nicht angetreten" – kein Ziehen mehr nötig, keine zusätzliche Markierung (der rote Rahmen bleibt wie gehabt). Es öffnen sich dieselben Dialoge wie beim Ziehen']},
@@ -7411,6 +7413,17 @@ function apSpeichereInnung(lgartId, text){
   _db.collection('shared').doc('kursSettings').collection('lehrgangsarten').doc(lgartId).set({innung:text},{merge:true})
     .then(()=>toast('Innung gespeichert – künftige Listen dieser Kursart füllen sie automatisch')).catch(()=>{});
 }
+// v908: eine Sitzplan-Zeile der Anwesenheitsliste (aus generateAnwListeAP ausgelagert,
+// damit Sitz- und Pool-TN in EINER alphabetischen Liste gemischt werden koennen).
+let _anwCtx=null;
+function _anwZeileSitz(i, sid, d, nameCell, ort, firma){
+  const {inst, tage, SP, ftCid, ED, anwesend}=_anwCtx;
+  const ft=ftCid?((d.extraGrades||{})[ftCid]||''):'';
+  let tds=''; for(let c=0;c<SP;c++){ const dt=tage[c]; tds+= (dt&&anwesend(sid,dt))?'<td class="c dz">✓</td>':'<td class="c dz"><span'+ED+'>&nbsp;</span></td>'; }
+  return '<tr><td class="c lfd">'+(i+1)+'</td><td class="tn">'+nameCell+ort+'</td><td class="bt">'+firma+'</td>'+tds
+    +[d.fuehrung,d.mitarbeit,d.praxis,ft].map(n=>'<td class="c nz">'+(n?esc(String(n)):'<span'+ED+'>&nbsp;</span>')+'</td>').join('')
+    +'<td class="bm"><span'+ED+' style="display:block;min-height:5mm">&nbsp;</span></td></tr>';
+}
 async function generateAnwListeAP(){
   const inst=curInst(); if(!inst){ toast('Kein Lehrgang geöffnet','bad'); return; }
   if(!inst.sY||!inst.sM||!inst.sD){ toast('Lehrgang hat kein Startdatum','bad'); return; }
@@ -7418,12 +7431,22 @@ async function generateAnwListeAP(){
   const bis=(inst.eY||inst.sY)+'-'+String(inst.eM||inst.sM).padStart(2,'0')+'-'+String(inst.eD||inst.sD).padStart(2,'0');
   // Sitze in Reihenfolge der Reihen, nur belegte
   const sids=[]; getRows(inst).forEach(r=>r.seats.forEach(sid=>{ const d=inst.seats[sid]; if(d&&d.name) sids.push(sid); }));
-  if(!sids.length){ toast('Keine Teilnehmer im Sitzplan','bad'); return; }
+  // v907: zusaetzlich TN, die dem Kurs zugewiesen sind, aber noch KEINEN Sitzplatz haben
+  // (Liste wird oft schon vor der Sitzverteilung gebraucht). Reihenfolge: erst Sitzplan,
+  // dann Pool-TN alphabetisch. Anwesenheits-Haekchen bleiben bei ihnen leer/ausfuellbar.
+  const platzierteIds=new Set(sids.map(sid=>inst.seats[sid].poolTnId).filter(Boolean));
+  const poolOhneSitz=(_poolTNCache||[])
+    .filter(t=>t&&t.id&&!platzierteIds.has(t.id))
+    .filter(t=>{ const st=_tnStatusMap[t.id]||''; return st!=='absent'&&st!=='wiederholer'; })
+    .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'de'));
+  if(!sids.length && !poolOhneSitz.length){ toast('Keine Teilnehmer im Kurs','bad'); return; }
   // Pool-Daten (Ort/Firma/Nachname) nachladen, wo verknuepft
-  const pool={};
+  const pool={}, poolCloud={};
   if(_db){
     await Promise.all(sids.map(async sid=>{ const d=inst.seats[sid]; if(!d.poolTnId) return;
       try{ const g=await _db.collection('globalTN').doc(d.poolTnId).get(); if(g.exists) pool[sid]=g.data()||{}; }catch(e){} }));
+    await Promise.all(poolOhneSitz.map(async t=>{
+      try{ const g=await _db.collection('globalTN').doc(t.id).get(); if(g.exists) poolCloud[t.id]=g.data()||{}; }catch(e){} }));
   }
   // Kursart / Innung / Kuerzel
   let innungVor='', lgartId='', kuerzel=(S.kats[S.curKat]&&S.kats[S.curKat].label)||'';
@@ -7448,17 +7471,28 @@ async function generateAnwListeAP(){
     return (d.attendance||[]).some(e=>e&&e.date===datum&&e.type==='present'); };
   const heute=new Date().toLocaleDateString('de-DE');
   const ED=' contenteditable="true" class="ed"';
-  const rows=sids.map((sid,i)=>{
-    const d=inst.seats[sid]; const g=pool[sid]||{};
+  _anwCtx={inst, tage, SP, ftCid, ED, anwesend};
+  // v908: EINE gemeinsame, durchgehend alphabetische Liste aus Sitzplan-TN und
+  // zugewiesenen TN ohne Sitzplatz - so wie die Kammerliste gedruckt wird.
+  const alle=[];
+  sids.forEach(sid=>{ const g=pool[sid]||{}; const d=inst.seats[sid];
+    alle.push({sortName:((g.nachname||'')+' '+(g.vorname||'')).trim()||String(d&&d.name||''), sid, d, g}); });
+  poolOhneSitz.forEach(t=>{ const g=poolCloud[t.id]||{};
+    alle.push({sortName:((g.nachname||'')+' '+(g.vorname||'')).trim()||String(t.name||''), sid:null, d:null, g, poolT:t}); });
+  alle.sort((a,b)=>a.sortName.localeCompare(b.sortName,'de'));
+  const rows=alle.map((row,i)=>{
+    const sid=row.sid, d=row.d||{}, g=row.g||{};
     const nach=g.nachname||'', vor=g.vorname||'';
-    const nameCell=(nach||vor)?esc(nach+', '+vor):esc(d.name||'');
+    const nameCell=(nach||vor)?esc(nach+', '+vor):esc(d.name||row.poolT?.name||'');
     const ort=g.ort?', '+esc(g.ort):'';
-    const firma=esc(g.firma||d.company||d.firma||'');
-    const ft=ftCid?((d.extraGrades||{})[ftCid]||''):'';
-    let tds=''; for(let c=0;c<SP;c++){ const dt=tage[c]; tds+= (dt&&anwesend(sid,dt))?'<td class="c dz">✓</td>':'<td class="c dz"><span'+ED+'>&nbsp;</span></td>'; }
-    return '<tr><td class="c lfd">'+(i+1)+'</td><td class="tn">'+nameCell+ort+'</td><td class="bt">'+firma+'</td>'+tds
-      +[d.fuehrung,d.mitarbeit,d.praxis,ft].map(n=>'<td class="c nz">'+(n?esc(String(n)):'<span'+ED+'>&nbsp;</span>')+'</td>').join('')
-      +'<td class="bm"><span'+ED+' style="display:block;min-height:5mm">&nbsp;</span></td></tr>';
+    const firma=esc(g.firma||d.company||d.firma||row.poolT?.firma||'');
+    if(!sid){   // zugewiesen, aber ohne Sitzplatz: Haekchen und Noten leer/ausfuellbar
+      let tdsP=''; for(let c=0;c<SP;c++) tdsP+='<td class="c dz"><span'+ED+'>&nbsp;</span></td>';
+      return '<tr><td class="c lfd">'+(i+1)+'</td><td class="tn">'+nameCell+ort+'</td><td class="bt">'+firma+'</td>'+tdsP
+        +[0,1,2,3].map(()=>'<td class="c nz"><span'+ED+'>&nbsp;</span></td>').join('')
+        +'<td class="bm"><span'+ED+' style="display:block;min-height:5mm">&nbsp;</span></td></tr>';
+    }
+    return _anwZeileSitz(i, sid, d, nameCell, ort, firma);
   }).join('');
   let tagKopf=''; for(let c=0;c<SP;c++){ const dt=tage[c]; tagKopf+='<th class="c dz dk" style="font-weight:400">'+(dt?dt.slice(8,10)+'.':'&nbsp;')+'</th>'; }
   const html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>Anwesenheitsliste '+esc(kuerzel)+'</title><style>'
