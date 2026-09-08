@@ -1378,6 +1378,7 @@ function findTN(email){
     if(doc){
       _tnId=doc.id; _tnData=doc.data();
       try{ _syncEmailStatus(); }catch(e){}
+      try{ setTimeout(_magnetNachDatum, 1200); }catch(e){}
       return true;
     }
     // 2) Fallback: Suche über E-Mail (z.B. Bestand-TN vor erster Verknüpfung)
@@ -3709,7 +3710,7 @@ function _refreshAuthStatusOnReturn(){
   _lastAuthRefresh=now;
   u.reload().then(()=>{ try{ _syncEmailStatus(); }catch(e){} try{ refreshEmailHint(); }catch(e){} }).catch(()=>{});
 }
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') _refreshAuthStatusOnReturn(); });
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'){ _refreshAuthStatusOnReturn(); try{ _magnetNachDatum(); }catch(e){} } });
 window.addEventListener('focus', _refreshAuthStatusOnReturn);
 
 function checkSitzplatzPopup(){
@@ -7312,6 +7313,30 @@ function _renderMeineMeldungen(el, rows){
       +'</div>';
   });
   el.innerHTML=h;
+}
+// ═══ v322: Magnet nach Datum nachziehen ═══
+// Der "Magnet" (aktiverKursId) zeigt bisher auf den zuletzt gescannten Kurs. Bei einem
+// Folgekurs (gleiche TN, neue Woche) haengt er am alten Lehrgang, bis einmal gescannt
+// wurde. Hier korrigieren wir das anhand des DATUMS: laeuft ein Kurs aus meiner
+// Kurshistorie heute, wandert der Magnet still dorthin. Laeuft keiner, bleibt alles wie es ist.
+let _magnetGeprueft=0;
+function _magnetNachDatum(){
+  try{
+    if(!_tnId||!_tnData||!db) return;
+    if(Date.now()-_magnetGeprueft < 60000) return;     // hoechstens einmal pro Minute
+    _magnetGeprueft=Date.now();
+    const heute=new Date().toISOString().slice(0,10);
+    const hist=(_tnData.kursHistory||[]).filter(h=>h&&h.kursId&&h.von&&h.bis);
+    const heutiger=hist.find(h=>h.von<=heute&&h.bis>=heute);
+    if(!heutiger) return;                               // heute laeuft keiner -> nichts tun
+    if(_tnData.aktiverKursId===heutiger.kursId) return; // stimmt bereits
+    db.collection('globalTN').doc(_tnId).update({aktiverKursId:heutiger.kursId})
+      .then(()=>{
+        _tnData.aktiverKursId=heutiger.kursId;
+        try{ loadKurse(); }catch(e){}
+        console.log('[Magnet] auf heutigen Lehrgang gesetzt:', heutiger.kursName||heutiger.kursId);
+      }).catch(()=>{});
+  }catch(e){}
 }
 function loadKurse(){
   const el=document.getElementById('homeKurse');
