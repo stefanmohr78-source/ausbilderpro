@@ -4729,10 +4729,26 @@ function _onQRScanned(data){
   if(!kursId&&/^[A-Za-z0-9_-]{6,}$/.test((data||'').trim())) kursId=data.trim();
   stopQRScanner();
   if(!kursId){ _checkinBanner('warn','⚠ Das ist kein Kurs-QR-Code.'); return; }
-  if(kursId!==_tnData?.aktiverKursId){ _checkinBanner('warn','⚠ Dieser QR-Code gehört nicht zu deinem aktuellen Lehrgang.'); return; }
-  _checkinKursId=kursId;
-  _checkinDone=false;
-  _tryQRCheckin();
+  // v322: Nicht mehr nur den "Magneten" (aktiverKursId) pruefen. Der zeigt auf den
+  // zuletzt gescannten Kurs - beim Wechsel auf einen Folgekurs (gleiche TN, neue Woche)
+  // haengt er noch am alten Lehrgang und der neue QR-Code wurde faelschlich abgelehnt.
+  // Verlaessliche Quelle ist der Teilnehmer-Eintrag AM KURS: steht der Azubi dort, darf
+  // er einchecken - und der Magnet wandert gleich mit, damit sich das selbst repariert.
+  if(kursId===_tnData?.aktiverKursId){
+    _checkinKursId=kursId; _checkinDone=false; _tryQRCheckin(); return;
+  }
+  _checkinBanner('info','⏳ Lehrgang wird geprüft…');
+  db.collection('shared').doc('kurse').collection('list').doc(kursId)
+    .collection('teilnehmer').doc(_tnId).get()
+    .then(snap=>{
+      if(!snap.exists){ _checkinBanner('warn','⚠ Dieser QR-Code gehört nicht zu deinem aktuellen Lehrgang.'); return; }
+      // Eingetragen -> Magnet nachziehen (still) und einchecken
+      db.collection('globalTN').doc(_tnId).update({aktiverKursId:kursId})
+        .then(()=>{ if(_tnData) _tnData.aktiverKursId=kursId; })
+        .catch(()=>{});
+      _checkinKursId=kursId; _checkinDone=false; _tryQRCheckin();
+    })
+    .catch(()=>{ _checkinBanner('warn','⚠ Prüfung fehlgeschlagen – bitte erneut scannen.'); });
 }
 // ── Schritt 3d: QR-Anwesenheit erst nach Ausbilder-Freigabe ──
 // Liest den Kurs-Teilnehmer-Eintrag; pending (bestaetigungAngefordert && !bestaetigtAm) -> false.
