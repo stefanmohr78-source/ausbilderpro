@@ -2010,7 +2010,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v911';
+const APP_VERSION = 'v912';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2025,6 +2025,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v912', d:'08.09.2026', items:['🐛 Kreislauf durchbrochen: Anwesenheitstage außerhalb des Lehrgangszeitraums werden nicht mehr als Check-ins in die Cloud zurückgeschrieben und Live-Zettel fremder Tage nicht mehr angewendet – gelöschte Häkchen bleiben jetzt endgültig gelöscht']},
   {v:'v911', d:'08.09.2026', items:['🐛 Wichtiger Fix: Der automatische Nachzug aus Check-ins prüfte den Kurszeitraum mit falschen Feldnamen und trug deshalb auch Check-ins von außerhalb des Lehrgangs nach – gelöschte Anwesenheits-Häkchen kamen beim nächsten Öffnen des Kurses immer wieder zurück']},
   {v:'v910', d:'08.09.2026', items:['🔒 „Alle anwesend" trägt nichts mehr ein, wenn das heutige Datum außerhalb des Lehrgangszeitraums liegt – so entstand am Folgetag ein zusätzlicher Anwesenheitstag im bereits beendeten Kurs, der sich über die Check-ins immer wieder zurückholte']},
   {v:'v909', d:'08.09.2026', items:['📊 Korrektur zu v906: Die Anwesenheitsquote rechnet wieder gegen die eingetragenen Kurstage (die geänderte Bezugsgröße erzeugte krumme Prozentwerte). Die 100%-Deckelung bleibt; Verspätungen zählen weiterhin als voller Anwesenheitstag']},
@@ -7153,6 +7154,13 @@ function _spiegleCheckins(inst, sid){
     const tage=new Set();
     (d.attendance||[]).forEach(e=>{ if(e&&e.type==='present'&&e.date) tage.add(e.date); });
     Object.entries(inst.attendance||{}).forEach(([date,slots])=>{ if(slots&&slots[sid]==='P') tage.add(date); });
+    // v912: NUR Tage innerhalb des Lehrgangs zurueckspiegeln. Ohne diese Pruefung entstand
+    // ein Kreislauf: ein Anwesenheitstag ausserhalb des Kurses (z.B. Folgetag) wurde beim
+    // Speichern als Check-in in die Cloud geschrieben und beim naechsten Oeffnen vom
+    // Auto-Nachzug wieder eingelesen - geloeschte Haekchen kamen dadurch immer zurueck.
+    const _kVon=(inst.sY&&inst.sM&&inst.sD)?(inst.sY+'-'+String(inst.sM).padStart(2,'0')+'-'+String(inst.sD).padStart(2,'0')):'';
+    const _kBis=(inst.eY&&inst.eM&&inst.eD)?(inst.eY+'-'+String(inst.eM).padStart(2,'0')+'-'+String(inst.eD).padStart(2,'0')):'';
+    if(_kVon||_kBis){ [...tage].forEach(t=>{ if((_kVon&&t<_kVon)||(_kBis&&t>_kBis)) tage.delete(t); }); }
     const ref=_db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('checkins');
     const heute=new Date().toISOString().slice(0,10);
     // anlegen (merge:false noetig? nein - set mit merge, viaAusbilder nur wenn neu ueber uns)
@@ -15257,6 +15265,13 @@ function _liveApplyDocs(inst, docs, initial){
     // 2) Anwesenheit
     Object.entries(docs).forEach(([id,d])=>{
       if(!id.startsWith('anw_')||!d) return;
+      // v912: Live-Zettel ausserhalb des Lehrgangszeitraums nicht anwenden
+      try{
+        const _dt=id.slice(4);
+        const _v=(inst.sY&&inst.sM&&inst.sD)?(inst.sY+'-'+String(inst.sM).padStart(2,'0')+'-'+String(inst.sD).padStart(2,'0')):'';
+        const _b=(inst.eY&&inst.eM&&inst.eD)?(inst.eY+'-'+String(inst.eM).padStart(2,'0')+'-'+String(inst.eD).padStart(2,'0')):'';
+        if((_v&&_dt<_v)||(_b&&_dt>_b)) return;
+      }catch(e){}
       const datum=id.slice(4);
       const eintraege=d.eintraege||{};
       const alt=_live.shadow.anw[datum]||{};
