@@ -2010,7 +2010,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v905';
+const APP_VERSION = 'v906';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2025,6 +2025,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v906', d:'08.09.2026', items:['📊 Anwesenheitsquote kann nicht mehr über 100% steigen: Bezugsgröße ist jetzt die größere von „eingetragene Kurstage" und „tatsächlich erfasste Tage" (ein Kurs mit 6 Werktagen bei 5 eingetragenen Kurstagen ergab 120%), zusätzlich hart auf 100% begrenzt']},
   {v:'v905', d:'07.09.2026', items:['⛔ Kurs-Check ab dem 3. Kurstag verbindlich: Teilnehmer ohne jede Einordnung – auch solche, die nur im Pool liegen – müssen als „Wiederholer" oder „Nicht angetreten" eingestuft werden; „✓ Ist doch da" bleibt immer möglich. Nachträglich zugewiesene Teilnehmer lösen den Zwang nicht aus']},
   {v:'v904', d:'07.09.2026', items:['👉 Unplatzierte Teilnehmer im Pool bekommen ab dem 2. Kurstag zwei Knöpfe direkt auf der Karte: „Wiederholer" und „Nicht angetreten" – kein Ziehen mehr nötig, keine zusätzliche Markierung (der rote Rahmen bleibt wie gehabt). Es öffnen sich dieselben Dialoge wie beim Ziehen']},
   {v:'v903', d:'07.09.2026', items:['⚠️ „Alle anwesend" fragt jetzt mit Klartext nach: zeigt vorab die Namen der Teilnehmer, die dadurch neu auf anwesend gesetzt würden, nennt die Anzahl bereits eingecheckter und warnt, dass der Knopf zum Nachtragen leerer Tage gedacht ist – nicht zum morgendlichen Vorab-Eintragen']},
@@ -5130,8 +5131,11 @@ function syncMobileAttToFirestore(sid){
   const total=present+absentE+absentU+sick+berufsschule;
   if(!total) return;
   const kurstage=inst.kurstage||5;
-  const effektiveTage=kurstage;
-  const attPercent=Math.round((present/effektiveTage)*100);
+  // v906: Bezugsgroesse ist die groessere von "eingetragene Kurstage" und "tatsaechlich
+  // erfasste Tage" - sonst ergibt ein Kurs mit 6 Werktagen, aber 5 eingetragenen Kurstagen,
+  // 120%. Zusaetzlich hart auf 100% gedeckelt: mehr als vollstaendig anwesend gibt es nicht.
+  const effektiveTage=Math.max(kurstage, total);
+  const attPercent=Math.min(100, Math.round((present/effektiveTage)*100));
   // Verspaetungs-Details je Kurstag mitspeichern, damit VerwaltungPro die Auflistung spiegeln kann
   const _bsSync=_bsDates(inst, seatAtt);
   const lateDetails=(seatAtt||[])
@@ -7201,7 +7205,9 @@ function syncAttendanceToFirestore(seatId){
   if(!total&&!hasGrades&&!hasWz) return;
   // Kurstage aus Instanz (default 5)
   const kurstage=inst.kurstage||5;
-  const attPercent=kurstage>0?Math.round((present/kurstage)*100):0;
+  // v906: siehe oben - Bezug auf die tatsaechlich erfassten Tage, hart auf 100% gedeckelt
+  const _bezugTage=Math.max(kurstage, total);
+  const attPercent=_bezugTage>0?Math.min(100, Math.round((present/_bezugTage)*100)):0;
   // Custom-Grade Labels werden NICHT pro TN gespeichert sondern zentral am Kurs-Doc
   // (siehe syncCustomGradesToCloud). Hier nur die Werte, nicht die Labels - damit
   // Firestore-Rules-Whitelist eingehalten wird (noten_extra_labels ist nicht erlaubt).
