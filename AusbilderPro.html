@@ -2010,7 +2010,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v910';
+const APP_VERSION = 'v911';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2025,6 +2025,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v911', d:'08.09.2026', items:['🐛 Wichtiger Fix: Der automatische Nachzug aus Check-ins prüfte den Kurszeitraum mit falschen Feldnamen und trug deshalb auch Check-ins von außerhalb des Lehrgangs nach – gelöschte Anwesenheits-Häkchen kamen beim nächsten Öffnen des Kurses immer wieder zurück']},
   {v:'v910', d:'08.09.2026', items:['🔒 „Alle anwesend" trägt nichts mehr ein, wenn das heutige Datum außerhalb des Lehrgangszeitraums liegt – so entstand am Folgetag ein zusätzlicher Anwesenheitstag im bereits beendeten Kurs, der sich über die Check-ins immer wieder zurückholte']},
   {v:'v909', d:'08.09.2026', items:['📊 Korrektur zu v906: Die Anwesenheitsquote rechnet wieder gegen die eingetragenen Kurstage (die geänderte Bezugsgröße erzeugte krumme Prozentwerte). Die 100%-Deckelung bleibt; Verspätungen zählen weiterhin als voller Anwesenheitstag']},
   {v:'v908', d:'08.09.2026', items:['🖨 Anwesenheitsliste jetzt durchgehend alphabetisch nach Nachname sortiert (statt nach Sitzplan-Reihenfolge)']},
@@ -14862,7 +14863,12 @@ function _autoNachtragCheckins(inst){
     if(!inst||!inst.sharedKursId||_demoMode||!_db) return;
     const kid=inst.sharedKursId, now=Date.now();
     if(_cinLast[kid] && now-_cinLast[kid]<60000) return; _cinLast[kid]=now;
-    const iVon=(inst.von||inst.startDatum||''), iBis=(inst.bis||inst.endDatum||'');
+    // v911: lokale Lehrgaenge speichern das Datum in sD/sM/sY + eD/eM/eY - die alten
+    // Feldnamen von/bis gibt es hier NICHT. Dadurch war der Zeitraum-Filter wirkungslos
+    // und Check-ins ausserhalb des Kurses (z.B. vom Folgetag) wurden immer wieder
+    // nachgetragen: geloeschte Haekchen kamen beim naechsten Oeffnen zurueck.
+    const iVon=(inst.sY&&inst.sM&&inst.sD)?(inst.sY+'-'+String(inst.sM).padStart(2,'0')+'-'+String(inst.sD).padStart(2,'0')):(inst.von||inst.startDatum||'');
+    const iBis=(inst.eY&&inst.eM&&inst.eD)?(inst.eY+'-'+String(inst.eM).padStart(2,'0')+'-'+String(inst.eD).padStart(2,'0')):(inst.bis||inst.endDatum||'');
     _db.collection('shared').doc('kurse').collection('list').doc(kid)
       .collection('checkins').get().then(snap=>{
         const je={};   // tnId -> {datum: zeit}
