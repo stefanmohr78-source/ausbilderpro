@@ -2010,7 +2010,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v909';
+const APP_VERSION = 'v910';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2025,6 +2025,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v910', d:'08.09.2026', items:['🔒 „Alle anwesend" trägt nichts mehr ein, wenn das heutige Datum außerhalb des Lehrgangszeitraums liegt – so entstand am Folgetag ein zusätzlicher Anwesenheitstag im bereits beendeten Kurs, der sich über die Check-ins immer wieder zurückholte']},
   {v:'v909', d:'08.09.2026', items:['📊 Korrektur zu v906: Die Anwesenheitsquote rechnet wieder gegen die eingetragenen Kurstage (die geänderte Bezugsgröße erzeugte krumme Prozentwerte). Die 100%-Deckelung bleibt; Verspätungen zählen weiterhin als voller Anwesenheitstag']},
   {v:'v908', d:'08.09.2026', items:['🖨 Anwesenheitsliste jetzt durchgehend alphabetisch nach Nachname sortiert (statt nach Sitzplan-Reihenfolge)']},
   {v:'v907', d:'08.09.2026', items:['🖨 Anwesenheitsliste enthält jetzt auch Teilnehmer, die dem Kurs zugewiesen sind, aber noch keinen Sitzplatz haben – die Liste lässt sich damit schon vor der Sitzverteilung drucken (Häkchen bei ihnen leer und ausfüllbar)']},
@@ -5018,6 +5019,15 @@ async function refreshAllSeatNamesFromGlobalTN(){
 function markAlleAnwesend(){ if(lockGuard())return;
   const inst=curInst(); if(!inst) return;
   const today=new Date().toISOString().slice(0,10);
+  // v910: Kein Eintrag ausserhalb des Lehrgangs-Zeitraums. Genau so entstand am 08.09.
+  // ein 6. Anwesenheitstag im bereits beendeten Kurs (31.08.-07.09.) - inkl. Check-ins,
+  // die sich beim naechsten Oeffnen immer wieder zurueckholten.
+  const _von=(inst.sY&&inst.sM&&inst.sD)?(inst.sY+'-'+String(inst.sM).padStart(2,'0')+'-'+String(inst.sD).padStart(2,'0')):null;
+  const _bis=(inst.eY&&inst.eM&&inst.eD)?(inst.eY+'-'+String(inst.eM).padStart(2,'0')+'-'+String(inst.eD).padStart(2,'0')):null;
+  if(_von&&_bis&&(today<_von||today>_bis)){
+    alert('📅 Heute ('+fmtD(today)+') liegt außerhalb des Lehrgangs ('+fmtD(_von)+' – '+fmtD(_bis)+').\n\nEs wird nichts eingetragen. Für Nachträge innerhalb des Zeitraums bitte den Sitzplatz öffnen und das Datum dort wählen.');
+    return;
+  }
   // v903: Vorab zeigen, WEN es betrifft. "Alle anwesend" ist zum Nachtragen leerer Tage
   // gedacht - wird es morgens gedrueckt, werden auch TN gruen, die gar nicht da sind.
   // Deshalb Klartext: wie viele haben schon eingecheckt, wie viele wuerden jetzt neu
